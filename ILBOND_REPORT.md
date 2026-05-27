@@ -2,7 +2,7 @@
 ## Live Deployment & Validation Report
 
 **Author:** Prakhar Srivastava
-**Date:** May 1, 2026
+**Date:** May 27, 2026 (fresh two-wallet validation run)
 **Networks:** Ethereum Sepolia + Reactive Network (Lasna Testnet)
 
 ---
@@ -182,108 +182,163 @@ service.subscribe(destChainId, hook, ilBondDataBundleTopic);
 
 ---
 
-## 5. Live Deployment & Validation
+## 5. Live Deployment & Validation (Fresh Run — 2026-05-27)
+
+End-to-end run with **two independent wallets**, so the IL-bond sale is a genuine
+bilateral trade rather than a self-deal:
+
+| Wallet | Role | Address |
+|--------|------|---------|
+| W1 | LP / FEE-T holder | `0x49aBE186a9B24F73E34cCAe3D179299440c352aC` |
+| W2 | IL-T buyer | `0xcD46C4C833725bC46b8aA4136BCdd35b615b5BC5` |
 
 ### 5.1 Deployed Contracts
 
-| Contract | Network | Chain ID | Address |
-|----------|---------|----------|---------|
-| Token ALPHA | Sepolia | 11155111 | `0x8A39Be90ca02ffb4F95044010786aabB1BE0138E` |
-| Token BETA | Sepolia | 11155111 | `0x8bFD268b0Bf3bD661AEC714e73cB661A7De441a5` |
-| ILBondHook | Sepolia | 11155111 | `0x5188ccd3560d19fab804cc49cafc6463157090c0` |
-| ILBondReactive | Lasna | 5318007 | `0x75C012f18C1e79561a9327acD897DAb2EB3ce319` |
+| Contract | Network | Chain ID | Address | Deploy tx |
+|----------|---------|----------|---------|-----------|
+| ALPHA (token0) | Sepolia | 11155111 | `0x1E0a671C889e49fA2Ecf2F07E3930cd9B11E3591` | `0x11d59cea32243e572abf1ad0127f33e2f2390dc77121f15719b8a0bb2306b5a2` |
+| BETA (token1) | Sepolia | 11155111 | `0x9a731FC6652C8cc101ABcB0717d808ab09397aB9` | `0x7f3ca7f67890fca544ed6b0c2ce8f3554e8c290533aa52a04308d1db204a9d46` |
+| ILBondHook | Sepolia | 11155111 | `0x55f571E0DC76De9154DeA40B4749a6449CF510C0` | `0x3387273a8c3fa779ee339786f2ab121f42829615e16f3d7aad78b917bd9d22ce` |
+| ILBondReactive | Lasna | 5318007 | `0xe560786b23fd0408E8f42a6799630294F87203d9` | `0x9e91708c5c53685366c4102b0270414398b4b10fd9cc82a918c34f7a0e172b64` |
 
-### 5.2 Test Scenario Executed
-
-**Step 1 — Pool Creation & Base Liquidity**
-- V4 pool ALPHA/BETA initialized with `DYNAMIC_FEE_FLAG | tickSpacing 60` at 1:1.
-- Base liquidity 100e18 seeded via PositionManager.
-
-**Step 2 — Position 0 (pre-RC)**
-```
-depositILBond(
-  liquidity     = 10e18
-  range         = [-887220, 887220]
-  askPremium    = 0.1 BETA
-)
-→ positionId: 0
-→ FEE-T holder = LP, IL-T holder = LP (initially)
-```
-
-**Step 3 — IL-T Sale**
-- `buyILBond(0)` from LP wallet (acting as both LP and IL-T buyer for testing).
-- IL-T transferred to buyer; 0.1 BETA premium credited to FEE-T holder's withdrawable balance.
-- `ilBondSold = true`.
-
-**Step 4 — Initial Swaps (price moves into deep IL territory)**
-- 20e18 zeroForOne (price drops sharply)
-- 10e18 oneForZero (partial recovery)
-- 15e18 zeroForOne (further drop)
-- Final tick: -3697 (price down ~31% relative to entry, real IL accumulating)
-
-**Step 5 — Reactive Contract Deployment**
-- Deployed `ILBondReactive` on Lasna funded with 1.0 REACT.
-- Subscribed to 4 topics on Sepolia.
-
-**Step 6 — Position 1 (post-RC)**
-```
-depositILBond(
-  liquidity   = 5e18
-  askPremium  = 0.05 BETA
-)
-→ positionId: 1
-RC saw PositionCreated → activeCount=1
-```
-
-**Step 7 — Continuous Swaps & RC Pipeline**
-- 8 additional swaps, alternating directions.
-- Each swap fired SwapOccurred → RC reacted by emitting Callback to `prepareILBondData(address)`.
-- Hook packed `(currentSqrt, PositionData[])` into `ILBondDataBundle` event.
-- RC consumed the bundle in ReactVM, computed IL per position via `1 − 2√r/(1+r)`, and emitted `settleILMark(positionId, ilBps, markValue)` callbacks back to the hook.
-
-### 5.3 On-Chain Results
-
-**Hook state (post-validation):**
-```
-activePositionCount: 2
-bundleCounter:       1   (two-phase relay landed once)
-Position 0:
-  lp / feeHolder / ilHolder: 0x49aBE186… (test wallet acted as all three)
-  active: true, ilBondSold: true
-  liquidity: 10e18
-  entrySqrtPriceX96: 79228162514264337593543950336 (1:1)
-  askPremium: 0.1 BETA
-Position 1:
-  active: true, ilBondSold: false
-  liquidity: 5e18
-  entrySqrtPriceX96: 63468717653874821956875025297 (≈ tick -3700)
-  askPremium: 0.05 BETA
-```
-
-**Reactive Contract state on Lasna:**
-```
-activeCount:        1   (Position 1 actively tracked post-deploy)
-balance:            0.945 REACT  (started 1.0 → spent ~0.055 on lifecycle +
-                                  prepare + settle callbacks)
-debt:               0
-```
-
-**RC behaviour observed:**
-- Subscribed to all four topics on construction (no cron).
-- Consumed gas processing every swap (RC balance dropped from 1.0 → 0.957 → 0.945 REACT across the test window).
-- Bundle counter on hook incremented (proof of two-phase prepare → bundle → settle).
-- Pure event-driven: no idle gas burn between swaps.
-
-### 5.4 Premium Settlement Flow Validated
+### 5.2 End-to-End Flow Graph (every arrow is a real on-chain tx)
 
 ```
-Before buyILBond:                      After buyILBond:
-  feeHolder withdrawable[BETA] = 0      feeHolder withdrawable[BETA] = 0.1 BETA
-  ilHolder = LP                          ilHolder = buyer
+╔══════════════════════════ SEPOLIA · chain 11155111 ══════════════════════════╗
+║                                                                              ║
+║  [1] Deploy ILBondHook (CREATE2, mined for hook-flag bits)                   ║
+║        tx 0x3387273a…bd9d22ce                                                ║
+║                                                                              ║
+║  [2] Deploy ALPHA + BETA · [3] init dynamic-fee pool @ 1:1 · [4] seed 100e18 ║
+║        init  tx 0x99bac1eb…f6c90232      seed tx 0x22c68c0b…bd5b15a2          ║
+║                                  │                                           ║
+║  [5] W1 depositILBond ──────────►│  position 0: L=10e18, premium 0.1 BETA    ║
+║        tx 0x29a6af7d…c22579952   │  FEE-T = W1, IL-T = W1                     ║
+║                                  ▼                                           ║
+║  [6] W2 buyILBond(0) ─ pays 0.1 BETA ─► credited to W1                       ║
+║        approve tx 0x11cd9434…b72a5b44                                        ║
+║        buy     tx 0xb06f25ec…4a74799c8a34                                    ║
+║        RESULT: IL-T → W2, ilBondSold = true                                  ║
+║                                  │                                           ║
+║  [7] Fund hook 0.05 ETH + coverDebt()  ◄── CC must pre-pay callback gas      ║
+║        fund  tx 0x7546d813…43b21df8     cover tx 0x49aa4984…ec6540fe         ║
+║                                  │                                           ║
+║  [8] W1 swaps  20→ / 10← / 15→   price 1:1 ──► tick −6237 (~46% drop)         ║
+║        tx 0x3ae490ad…327ab03e / 0x138e2c09…2f8f6d39 / 0x16e8436d…1745c151     ║
+║                                  │                                           ║
+║        each swap emits  SwapOccurred ─────────────────────┐                  ║
+╚═══════════════════════════════════════════════════════════│══════════════════╝
+                                                             │
+                          (Reactive Network monitors Sepolia)│
+                                                             ▼
+╔════════════════════════ REACTIVE LASNA · chain 5318007 ══════════════════════╗
+║  [C] ILBondReactive deployed, subscribed to 4 hook topics, funded 2 REACT    ║
+║                                                                              ║
+║      react(SwapOccurred)       ─emit Callback─►  prepareILBondData(hook)      ║
+║      react(ILBondDataBundle)   ─compute IL ─►    settleILMark(hook,…)         ║
+║          IL = 1 − 2√r/(1+r)  computed inside the ReactVM                      ║
+╚═══════════════════════════════════│══════════════════════════════════════════╝
+                                     │ callbacks delivered back to Sepolia
+                                     ▼
+╔══════════════════════════ SEPOLIA · chain 11155111 ══════════════════════════╗
+║  [9]  prepareILBondData ──► hook emits ILBondDataBundle  (bundleCounter++)    ║
+║        tx 0x60dad23f…e0f9e312 / 0x1647a92f…e03b5ffe… / 0xc0c35d1c…49b7a3a…    ║
+║                                  │                                           ║
+║  [10] settleILMark ──► hook writes Position.ilMarkBps + emits ILMarkUpdated  ║
+║        tx 0x622c9e1a…0ce87ba5… / 0x6809a870…71be9cb4… / 0x7473891b…85697b574a ║
+║                                  ▼                                           ║
+║  RESULT (position 0):  ilMarkBps = −468  (−4.68% IL)                          ║
+║                        markValue = 9.532e18   ·   bundleCounter = 4           ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+```
+
+### 5.3 Full Transaction Reference (Sepolia unless noted)
+
+**Setup & position (W1)**
+| Step | Action | Tx hash |
+|------|--------|---------|
+| 1 | Deploy ILBondHook (CREATE2) | `0x3387273a8c3fa779ee339786f2ab121f42829615e16f3d7aad78b917bd9d22ce` |
+| 2a | Deploy ALPHA | `0x11d59cea32243e572abf1ad0127f33e2f2390dc77121f15719b8a0bb2306b5a2` |
+| 2b | Deploy BETA | `0x7f3ca7f67890fca544ed6b0c2ce8f3554e8c290533aa52a04308d1db204a9d46` |
+| 3 | Initialize pool | `0x99bac1eb96b1c31e6d183762706cf359a27cb032edc9776b1ff02dbaf6c90232` |
+| 4 | Seed base liquidity | `0x22c68c0b6d7661bd324d54552e7cb54d4f3e636454a64c891d992e5dbd5b15a2` |
+| 5 | depositILBond → position 0 | `0x29a6af7d35449a8d22deacaf121a540345a9dd326e184f30aedf033c22579952` |
+
+> Plus token mints + 10 approvals (Permit2 / hook / router) in the same Wallet1 broadcast
+> (`broadcast/20_ILBondFlow.s.sol/11155111/run-latest.json`).
+
+**IL-T sale (W2)**
+| Step | Action | Tx hash |
+|------|--------|---------|
+| 6a | W2 approve BETA → hook | `0x11cd9434d26adbbb988d966411c85031c57e9ba1f600844f05ec488bb72a5b44` |
+| 6b | W2 buyILBond(0) | `0xb06f25ecaf9d82b65688534d92885ffea5351d48c95840922cf74a74799c8a34` |
+
+**Reactive contract (W1, Lasna)**
+| Step | Action | Tx hash |
+|------|--------|---------|
+| C | Deploy ILBondReactive (+2 REACT) | `0x9e91708c5c53685366c4102b0270414398b4b10fd9cc82a918c34f7a0e172b64` |
+
+**Callback funding + price-moving swaps (W1)**
+| Step | Action | Tx hash |
+|------|--------|---------|
+| 7a | Fund hook 0.05 ETH | `0x7546d813405730982f62058cf26d8b26d45dbf49dd18b3aa5f7459eb43b21df8` |
+| 7b | coverDebt() | `0x49aa4984c411a93450669e2198af89f46caefc8fead1ead0e594c83eec6540fe` |
+| 8a | swap 20e18 zeroForOne | `0x3ae490ad2565a5a37b29a1d495b21188869146cd5debf24afd7393d0327ab03e` |
+| 8b | swap 10e18 oneForZero | `0x138e2c0991eb493bf7b7ce4c7b3ef49b34fbd6bb635b5372b86e225b2f8f6d39` |
+| 8c | swap 15e18 zeroForOne | `0x16e8436d518cc9b98b92587f513220037b0cb7968ef72ee44dd9d8141745c151` |
+
+**RC → hook callbacks (sender = Sepolia callback proxy `0xc9f3…7bDA`)**
+| Step | Callback | Tx hash |
+|------|----------|---------|
+| 9 | prepareILBondData → ILBondDataBundle | `0x60dad23fae1d164859d73c6a5766a67c15b07296d312a21b317746b8e0f9e312` |
+| 9 | prepareILBondData → ILBondDataBundle | `0x1647a92fbe7226afdcd41d8288e9df9fb322dd11364a469e03b5ffe3c06adbfd` |
+| 9 | prepareILBondData → ILBondDataBundle | `0xc0c35d1c6bf0c8e47f7e8d1fd816830d8d541febd90b15ed249b7a3a1611d11d` |
+| 10 | settleILMark → ILMarkUpdated | `0x622c9e1ab936b81610432a4484c7bd7a30fafb36bef47772560ce87ba5c186dd` |
+| 10 | settleILMark → ILMarkUpdated | `0x6809a8706fcb85a80b68703c9415e600879da36bf840e35a071be9cb46f094a8` |
+| 10 | settleILMark → ILMarkUpdated | `0x7473891bb310c3a0f71637845d14e0fc7b7591929f017eb57a7d0785697b574a` |
+
+### 5.4 On-Chain Results
+
+**Hook (Sepolia), read via `getPosition(0)`:**
+```
+lp / feeHolder:  0x49aBE186…  (W1)
+ilHolder:        0xcD46C4C8…  (W2)        ← IL-T sold to the second wallet
+active:          true,  ilBondSold: true
+liquidity:       10e18
+entrySqrtPriceX96: 79228162514264337593543950336 (1:1)
+askPremium:      0.1 BETA
+ilMarkBps:       -468            ← RC-posted mark: -4.68% IL
+markValue:       9.532e18
+bundleCounter:   4
+```
+
+**W1 withdrawable (Sepolia):** `amount1 = 0.1 BETA` — the premium, paid by W2.
+
+**Reactive Contract (Lasna):** balance `1.957 REACT` (deployed with 2.0; ~0.043 spent
+across prepare + settle callbacks), `activeCount = 0` (position 0 predates the RC, so it
+was never counted — yet the hook still marks it because it iterates its *own* active set).
+
+### 5.5 Operational Note — the Callback Contract Must Be Funded
+
+The hook is an `AbstractPayer`: every callback it receives is billed by the Sepolia
+callback proxy. On the first run the hook had **0 ETH**, so it went into debt after the
+very first `prepareILBondData` callback and the proxy stopped delivering anything further
+— `bundleCounter` froze at 1 and no IL mark ever settled. Sending 0.05 ETH to the hook and
+calling `coverDebt()` (steps 7a/7b) cleared the debt; the next swaps then completed the
+full prepare → bundle → settle loop. **A reactive CC needs gas money on the destination
+chain, exactly like the RC needs REACT on Lasna.**
+
+### 5.6 Premium Settlement Flow Validated
+
+```
+Before buyILBond (W2):                 After buyILBond (W2):
+  W1 withdrawable[BETA] = 0             W1 withdrawable[BETA] = 0.1 BETA
+  ilHolder = W1                          ilHolder = W2
   ilBondSold = false                     ilBondSold = true
 ```
 
-The 0.1 BETA premium moved from buyer → FEE-T holder atomically. No pool, no insurance fund — just a bilateral premium for transferring the IL leg.
+The 0.1 BETA premium moved from buyer (W2) → FEE-T holder (W1) atomically. No pool, no
+insurance fund — just a bilateral premium for transferring the IL leg.
 
 ---
 
@@ -318,8 +373,10 @@ v4-template/
 │   ├── ILBondReactive.sol        # Reactive Contract (deployed on Lasna)
 │   └── MockERC20.sol
 ├── script/
-│   ├── 11_DeployILBondHook.s.sol      # CREATE2 salt-mined deployment
-│   └── 13_ILBondSeedAndDeposit.s.sol  # End-to-end seed + deposit + buy + swaps
+│   ├── 11_DeployILBondHook.s.sol      # CREATE2 salt-mined hook deployment
+│   ├── 13_ILBondSeedAndDeposit.s.sol  # single-wallet seed + deposit + buy + swaps
+│   ├── 20_ILBondFlow.s.sol            # full Sepolia setup: hook+tokens+pool+seed+position 0
+│   └── 21_ILBondSwaps.s.sol           # price-moving swaps that drive the RC pipeline
 ├── ILBOND_PITCH.md               # 1-page pitch with visuals
 ├── ILBOND_REPORT.md              # This report
 └── foundry.toml                  # via_ir=true, optimizer=200 runs
