@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useAccount } from 'wagmi'
 import { ADDR, HOOK_ABI } from '../config/contracts'
-import { usePositions, useTokenInfo, useWithdrawable, useCurrentPrice } from '../hooks/reads'
+import { usePositions, useTokenInfo, useWithdrawable, useHookCounters } from '../hooks/reads'
 import { useTx } from '../hooks/useTx'
 import { isSameAddr, fmtToken, shortAddr } from '../lib/format'
 import Stat from '../components/ui/Stat'
@@ -34,7 +34,7 @@ export default function Dashboard() {
   const { positions, refetch: refetchPositions } = usePositions()
   const { bal0, bal1 } = useTokenInfo(address)
   const { amount0, amount1, refetch: refetchWithdrawable } = useWithdrawable(address)
-  const { data: price } = useCurrentPrice()
+  const { bundles } = useHookCounters()
   const { run, pending } = useTx()
 
   const mine = useMemo(
@@ -149,7 +149,7 @@ export default function Dashboard() {
                     {isSameAddr(address, p.feeHolder) && <Leg kind="fee" />}
                     {isSameAddr(address, p.ilHolder) && <Leg kind="il" />}
                   </div>
-                  <PositionCard position={p} marked={price?.hasSwaps} onAction={() => { refetchPositions(); refetchWithdrawable(); }} />
+                  <PositionCard position={p} marked={bundles > 0n} onAction={() => { refetchPositions(); refetchWithdrawable(); }} />
                 </div>
               ))}
           </div>

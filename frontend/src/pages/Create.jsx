@@ -131,9 +131,9 @@ export default function Create() {
         <Kicker>Creator console</Kicker>
         <h1 className="mt-2 font-black text-4xl tracking-tight sm:text-5xl">Mint an IL bond</h1>
         <p className="mt-3 max-w-2xl text-bone/55">
-          Provide full-range liquidity to the pool and set the premium you want for handing off the impermanent-loss risk.
-          You receive both legs — keep <Leg kind="fee" className="mx-0.5" /> for yourself and sell{' '}
-          <Leg kind="il" className="mx-0.5" /> on the market.
+          Add your two tokens to the pool, then name a premium. You get back two pieces: keep{' '}
+          <Leg kind="fee" className="mx-0.5" /> for the steady earnings, and sell <Leg kind="il" className="mx-0.5" /> — the
+          price risk — to someone who wants it.
         </p>
       </div>
 
@@ -149,8 +149,8 @@ export default function Create() {
         <Card className="p-6 sm:p-8">
           <div className="space-y-6">
             <Field
-              label="Liquidity (full range)"
-              hint="A v4 liquidity unit. At parity this pulls roughly equal ALPHA and BETA; unused tokens are refunded."
+              label="How much to deposit"
+              hint="Roughly how many of each token (ALPHA + BETA) you'll put in. Bigger means more fees earned — and more impermanent loss to hand off. Anything not used is sent right back to you."
             >
               <Input
                 type="number"
@@ -158,12 +158,15 @@ export default function Create() {
                 placeholder="10"
                 value={liq}
                 onChange={(e) => setLiq(e.target.value)}
-                suffix="L"
+                suffix="tokens"
                 invalid={liq !== '' && L <= 0n}
               />
             </Field>
 
-            <Field label="Ask premium" hint="What an IL-T buyer pays you upfront, in BETA, to take the price risk.">
+            <Field
+              label="Premium you charge"
+              hint="Upfront income, paid to you in BETA, by whoever buys the risk leg (IL-T). It's the price you put on handing off the impermanent-loss risk."
+            >
               <Input
                 type="number"
                 min="0"
@@ -252,8 +255,8 @@ export default function Create() {
                 <span className="font-mono tabular-nums">{fmtNum(curPrice, 4)} BETA/ALPHA</span>
               </li>
               <li className="flex justify-between">
-                <span className="text-bone/45">Swaps so far</span>
-                <span className="font-mono tabular-nums">{price?.swaps ?? '—'}</span>
+                <span className="text-bone/45">Current tick</span>
+                <span className="font-mono tabular-nums">{price?.tick ?? '—'}</span>
               </li>
               <li className="flex justify-between">
                 <span className="text-bone/45">Base fee</span>
@@ -278,7 +281,7 @@ export default function Create() {
               </li>
               <li className="flex gap-3">
                 <span className="font-mono text-volt">03</span>
-                The RSC marks IL on every swap — watch it in <b className="text-bone">Dashboard</b>.
+                The Reactive Network updates the loss after every trade — watch it in <b className="text-bone">Dashboard</b>.
               </li>
             </ol>
           </Card>

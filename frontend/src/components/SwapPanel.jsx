@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { useAccount, usePublicClient } from 'wagmi'
-import { parseUnits, maxUint256, maxUint160, maxUint48 } from 'viem'
+import { parseUnits, maxUint256 } from 'viem'
 import {
   ADDR,
   ERC20_ABI,
-  PERMIT2_ABI,
   SWAP_ROUTER_ABI,
   SEPOLIA_CHAIN_ID,
 } from '../config/contracts'
@@ -44,42 +43,20 @@ export default function SwapPanel({ onSwapped }) {
   const amountIn = safeParse(amount)
   const insufficient = balIn !== undefined && amountIn > balIn
 
-  async function ensureSwapApprovals() {
-    // 1) ERC20 → Permit2
-    const erc20Allow = await publicClient.readContract({
+  // This router pulls input tokens via a direct ERC20 transferFrom, so it needs
+  // a plain ERC20 approval to the router (not the Permit2 path).
+  async function ensureRouterAllowance() {
+    const allowance = await publicClient.readContract({
       address: tokenIn,
       abi: ERC20_ABI,
       functionName: 'allowance',
-      args: [address, ADDR.permit2],
+      args: [address, ADDR.swapRouter],
     })
-    if (erc20Allow < amountIn) {
-      const ok = await run(
-        { address: tokenIn, abi: ERC20_ABI, functionName: 'approve', args: [ADDR.permit2, maxUint256] },
-        { pendingMsg: `Approving ${symIn}…`, successMsg: `${symIn} approved` },
-      )
-      if (!ok) return false
-    }
-    // 2) Permit2 → router
-    const [permitAmount, expiration] = await publicClient.readContract({
-      address: ADDR.permit2,
-      abi: PERMIT2_ABI,
-      functionName: 'allowance',
-      args: [address, tokenIn, ADDR.swapRouter],
-    })
-    const now = BigInt(Math.floor(Date.now() / 1000))
-    if (permitAmount < amountIn || BigInt(expiration) < now) {
-      const ok = await run(
-        {
-          address: ADDR.permit2,
-          abi: PERMIT2_ABI,
-          functionName: 'approve',
-          args: [tokenIn, ADDR.swapRouter, maxUint160, Number(maxUint48)],
-        },
-        { pendingMsg: 'Authorizing router…', successMsg: 'Router authorized' },
-      )
-      if (!ok) return false
-    }
-    return true
+    if (allowance >= amountIn) return true
+    return await run(
+      { address: tokenIn, abi: ERC20_ABI, functionName: 'approve', args: [ADDR.swapRouter, maxUint256] },
+      { pendingMsg: `Approving ${symIn}…`, successMsg: `${symIn} approved` },
+    )
   }
 
   async function swap() {
@@ -91,7 +68,7 @@ export default function SwapPanel({ onSwapped }) {
       toast({ variant: 'error', title: `Not enough ${symIn}`, desc: 'Mint more on the Create page.' })
       return
     }
-    if (!(await ensureSwapApprovals())) return
+    if (!(await ensureRouterAllowance())) return
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600)
     await run(
       {

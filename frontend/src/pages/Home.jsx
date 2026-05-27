@@ -46,10 +46,11 @@ export default function Home() {
             </h1>
 
             <p className="mt-7 max-w-xl text-lg leading-relaxed text-bone/60">
-              Every Uniswap LP is two things glued together: <span className="text-yield">fee income</span> and{' '}
-              <span className="text-risk">impermanent loss</span>. <b className="text-bone">schizō</b> unbundles them into
-              two tradable claims — <Leg kind="fee" className="mx-0.5" /> for yield, <Leg kind="il" className="mx-0.5" /> for
-              price risk — and lets the Reactive Network mark that risk to market on every swap.
+              Providing liquidity bundles two things together: <span className="text-yield">the fees you earn</span> and{' '}
+              <span className="text-risk">the loss when prices move</span> (impermanent loss). <b className="text-bone">schizō</b>{' '}
+              splits them into two pieces you can trade on their own — <Leg kind="fee" className="mx-0.5" /> for the earnings,{' '}
+              <Leg kind="il" className="mx-0.5" /> for the risk — and the Reactive Network keeps a live price on that risk after
+              every trade.
             </p>
 
             <div className="mt-9 flex flex-wrap gap-3">
@@ -129,10 +130,10 @@ export default function Home() {
         <h2 className="mt-3 font-black text-4xl tracking-tight">Four moves</h2>
         <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
           {[
-            { n: '01', t: 'Deposit', d: 'Provide v4 liquidity and set an ask premium. You mint FEE-T + IL-T and hold both.', c: 'volt' },
-            { n: '02', t: 'Sell the risk', d: 'A buyer pays your premium and takes the IL-T leg. You keep yield; they take exposure.', c: 'risk' },
-            { n: '03', t: 'Markets move', d: 'Every swap shifts the price. The hook emits a price snapshot for the Reactive Network.', c: 'mint' },
-            { n: '04', t: 'Mark to market', d: 'The RSC computes IL off-chain and writes the mark back. Read it live, on-chain, anytime.', c: 'yield' },
+            { n: '01', t: 'Deposit', d: 'Add your tokens and set a premium. You get both pieces — FEE-T and IL-T — to start.', c: 'volt' },
+            { n: '02', t: 'Sell the risk', d: 'A buyer pays your premium and takes IL-T. You keep the earnings; they take the price risk.', c: 'risk' },
+            { n: '03', t: 'Prices move', d: 'Every trade moves the price, and that change is reported to the Reactive Network.', c: 'mint' },
+            { n: '04', t: 'Stay priced', d: 'The Reactive Network works out the new loss and writes it back on-chain — readable live by anyone.', c: 'yield' },
           ].map((s) => (
             <Card key={s.n} hover className="p-6">
               <div className={`font-black text-3xl text-${s.c}`}>{s.n}</div>

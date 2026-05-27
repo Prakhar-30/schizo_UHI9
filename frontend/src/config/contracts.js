@@ -13,6 +13,7 @@ export const ADDR = {
   token0: '0x1E0a671C889e49fA2Ecf2F07E3930cd9B11E3591', // ALPHA
   token1: '0x9a731FC6652C8cc101ABcB0717d808ab09397aB9', // BETA
   poolManager: '0xE03A1074c86CFeDd5C142C4F04F1a1536e203543',
+  stateView: '0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c',
   swapRouter: '0xf13D190e9117920c703d79B5F33732e10049b115',
   positionManager: '0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4',
   permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
@@ -108,4 +109,9 @@ export const SWAP_ROUTER_ABI = parseAbi([
 export const REACTIVE_ABI = parseAbi([
   'function activeCount() view returns (uint256)',
   'function owner() view returns (address)',
+])
+
+// Uniswap v4 StateView — read pool slot0 without touching event logs.
+export const STATEVIEW_ABI = parseAbi([
+  'function getSlot0(bytes32 poolId) view returns (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee)',
 ])

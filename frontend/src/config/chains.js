@@ -3,6 +3,10 @@ import { sepolia as wagmiSepolia } from 'wagmi/chains'
 
 const SEPOLIA_RPC = import.meta.env.VITE_SEPOLIA_RPC || 'https://ethereum-sepolia-rpc.publicnode.com'
 const LASNA_RPC = import.meta.env.VITE_LASNA_RPC || 'https://lasna-rpc.rnk.dev/'
+// Dedicated endpoint for eth_getLogs — many providers (incl. Alchemy free tier)
+// cap log queries to ~10 blocks, so the activity feed reads from a permissive
+// public RPC instead of the main Sepolia transport.
+export const LOG_RPC = import.meta.env.VITE_LOG_RPC || 'https://ethereum-sepolia-rpc.publicnode.com'
 
 // Ethereum Sepolia — where ILBondHook + the V4 pool live.
 export const sepolia = {

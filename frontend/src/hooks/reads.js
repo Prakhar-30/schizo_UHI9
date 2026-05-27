@@ -1,34 +1,26 @@
 import { useMemo } from 'react'
-import { useReadContract, useReadContracts, usePublicClient, useBalance } from 'wagmi'
+import { useReadContract, useReadContracts, useBalance } from 'wagmi'
 import { useQuery } from '@tanstack/react-query'
+import { createPublicClient, http, parseEventLogs } from 'viem'
 import {
   ADDR,
   HOOK_ABI,
   ERC20_ABI,
   REACTIVE_ABI,
+  STATEVIEW_ABI,
   SEPOLIA_CHAIN_ID,
   LASNA_CHAIN_ID,
-  SQRT_PRICE_1_1,
 } from '../config/contracts'
 import { POOL_ID } from '../config/poolKey'
+import { sepolia, LOG_RPC } from '../config/chains'
 
 const hookBase = { address: ADDR.hook, abi: HOOK_ABI, chainId: SEPOLIA_CHAIN_ID }
 const REFRESH = 12000
 
-const EVENTS = HOOK_ABI.filter((i) => i.type === 'event')
-
-// getLogs over a wide window, falling back to a narrow one if the provider
-// rejects the range (some RPCs cap eth_getLogs at ~10k blocks).
-async function rangedLogs(client, params, lookback = 95000n) {
-  const latest = await client.getBlockNumber()
-  const from = latest > lookback ? latest - lookback : 0n
-  try {
-    return await client.getLogs({ ...params, fromBlock: from, toBlock: 'latest' })
-  } catch {
-    const narrow = latest > 9000n ? latest - 9000n : 0n
-    return await client.getLogs({ ...params, fromBlock: narrow, toBlock: 'latest' })
-  }
-}
+// Dedicated client for event-log reads — the main RPC may cap getLogs ranges
+// (Alchemy free tier = 10 blocks), so logs read from a permissive public RPC.
+const logClient = createPublicClient({ chain: sepolia, transport: http(LOG_RPC) })
+const LOG_LOOKBACK = 9500n
 
 // ── headline counters ──────────────────────────────────────────────────────
 export function useHookCounters() {
@@ -105,44 +97,36 @@ export function usePositions() {
   return { positions, count, isLoading: r.isLoading || (count > 0 && !r.data), refetch }
 }
 
-// ── current pool price (latest SwapOccurred) ────────────────────────────────
+// ── current pool price (read straight from v4 StateView, no logs) ───────────
 export function useCurrentPrice() {
-  const client = usePublicClient({ chainId: SEPOLIA_CHAIN_ID })
-  const swapEvent = EVENTS.find((e) => e.name === 'SwapOccurred')
-
-  return useQuery({
-    queryKey: ['current-price'],
-    enabled: !!client,
-    refetchInterval: REFRESH,
-    queryFn: async () => {
-      const logs = await rangedLogs(client, { address: ADDR.hook, event: swapEvent, args: { poolId: POOL_ID } })
-      if (!logs.length) {
-        return { sqrtPriceX96: SQRT_PRICE_1_1, tick: 0, liquidity: 0n, hasSwaps: false, swaps: 0 }
-      }
-      const last = logs[logs.length - 1]
-      return {
-        sqrtPriceX96: last.args.sqrtPriceX96,
-        tick: Number(last.args.tick),
-        liquidity: last.args.liquidity,
-        hasSwaps: true,
-        swaps: logs.length,
-      }
-    },
+  const r = useReadContract({
+    address: ADDR.stateView,
+    abi: STATEVIEW_ABI,
+    functionName: 'getSlot0',
+    args: [POOL_ID],
+    chainId: SEPOLIA_CHAIN_ID,
+    query: { refetchInterval: REFRESH },
   })
+  const d = r.data
+  return {
+    data: d ? { sqrtPriceX96: d[0], tick: Number(d[1]), lpFee: d[3] } : undefined,
+    refetch: r.refetch,
+    isLoading: r.isLoading,
+  }
 }
 
 // ── activity feed (all hook events, decoded + timestamped) ──────────────────
 export function useActivity({ limit = 50 } = {}) {
-  const client = usePublicClient({ chainId: SEPOLIA_CHAIN_ID })
-
   return useQuery({
     queryKey: ['activity', limit],
-    enabled: !!client,
     refetchInterval: REFRESH,
     queryFn: async () => {
-      const logs = await rangedLogs(client, { address: ADDR.hook, events: EVENTS })
+      const latest = await logClient.getBlockNumber()
+      const from = latest > LOG_LOOKBACK ? latest - LOG_LOOKBACK : 0n
+      const raw = await logClient.getLogs({ address: ADDR.hook, fromBlock: from, toBlock: 'latest' })
+      const decoded = parseEventLogs({ abi: HOOK_ABI, logs: raw })
 
-      const ordered = logs
+      const ordered = decoded
         .sort((a, b) =>
           a.blockNumber === b.blockNumber
             ? Number(a.logIndex - b.logIndex)
@@ -152,7 +136,7 @@ export function useActivity({ limit = 50 } = {}) {
         .reverse()
 
       const uniqueBlocks = [...new Set(ordered.map((l) => l.blockNumber))]
-      const blocks = await Promise.all(uniqueBlocks.map((bn) => client.getBlock({ blockNumber: bn })))
+      const blocks = await Promise.all(uniqueBlocks.map((bn) => logClient.getBlock({ blockNumber: bn })))
       const tsMap = {}
       blocks.forEach((b) => (tsMap[b.number.toString()] = Number(b.timestamp)))
 

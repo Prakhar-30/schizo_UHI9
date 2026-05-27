@@ -73,7 +73,7 @@ export default function Markets() {
         <Stat
           label="Pool price"
           value={price ? fmtNum(sqrtPriceToPrice(price.sqrtPriceX96), 4) : '—'}
-          sub={price?.hasSwaps ? `${price.swaps} swaps · tick ${price.tick}` : 'no swaps yet'}
+          sub={price ? `tick ${price.tick}` : 'reading…'}
           accent="mint"
         />
         <Stat
@@ -109,7 +109,7 @@ export default function Markets() {
           ) : (
             <div className="mt-6 grid gap-5 sm:grid-cols-2">
               {sorted.map((p) => (
-                <PositionCard key={p.id} position={p} marked={price?.hasSwaps} onAction={refetchPositions} />
+                <PositionCard key={p.id} position={p} marked={bundles > 0n} onAction={refetchPositions} />
               ))}
             </div>
           )}
