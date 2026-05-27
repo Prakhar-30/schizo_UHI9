@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-ink text-bone font-display antialiased;
+    background-image:
+      radial-gradient(1200px 600px at 70% -10%, rgba(124, 92, 255, 0.14), transparent 60%),
+      radial-gradient(900px 500px at 10% 10%, rgba(46, 248, 216, 0.08), transparent 55%);
+    background-attachment: fixed;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    @apply bg-volt text-white;
+  }
+
+  /* scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2a2a36 transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #2a2a36;
+    border-radius: 99px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: #7c5cff;
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  /* ── glass ─────────────────────────────────────────────── */
+  .glass {
+    @apply bg-white/[0.04] backdrop-blur-xl border border-white/10;
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+  }
+  .glass-strong {
+    @apply bg-white/[0.07] backdrop-blur-2xl border border-white/20;
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+  }
+
+  /* ── brutalist + glass card ────────────────────────────── */
+  .card {
+    @apply relative bg-ink-card/60 backdrop-blur-xl border-2 border-white/10 rounded-2xl;
+    box-shadow: 6px 6px 0 0 rgba(0, 0, 0, 0.55), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  }
+  .card-flat {
+    @apply relative bg-ink-card/50 backdrop-blur-xl border border-white/10 rounded-2xl;
+  }
+
+  /* brutalist label */
+  .kicker {
+    @apply font-mono text-[11px] uppercase tracking-[0.25em] text-white/40;
+  }
+
+  .hairline {
+    @apply border-white/10;
+  }
+
+  /* tag chip — hard edge, mono */
+  .chip {
+    @apply inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider px-2.5 py-1 border rounded-md;
+  }
+
+  /* link underline sweep */
+  .link {
+    @apply relative text-bone/70 hover:text-bone transition-colors;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .grid-bg {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+  .mask-fade-b {
+    -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent);
+    mask-image: linear-gradient(to bottom, black 60%, transparent);
+  }
+  .mask-fade-x {
+    -webkit-mask-image: linear-gradient(to right, transparent, black 12%, black 88%, transparent);
+    mask-image: linear-gradient(to right, transparent, black 12%, black 88%, transparent);
+  }
+  .text-stroke {
+    -webkit-text-stroke: 1.5px rgba(243, 239, 228, 0.85);
+    color: transparent;
+  }
+  .text-stroke-thin {
+    -webkit-text-stroke: 1px rgba(243, 239, 228, 0.5);
+    color: transparent;
+  }
+  .glow-volt {
+    box-shadow: 0 0 0 1px rgba(124, 92, 255, 0.4), 0 24px 70px -28px rgba(124, 92, 255, 0.8);
+  }
+  .glow-yield {
+    box-shadow: 0 0 0 1px rgba(198, 255, 46, 0.35), 0 24px 70px -28px rgba(198, 255, 46, 0.55);
+  }
+  .glow-risk {
+    box-shadow: 0 0 0 1px rgba(255, 46, 109, 0.4), 0 24px 70px -28px rgba(255, 46, 109, 0.7);
+  }
+}
+
+/* ── RainbowKit cosmetic tweaks ───────────────────────────── */
+[data-rk] button {
+  font-family: '"JetBrains Mono"', ui-monospace, monospace !important;
+}
