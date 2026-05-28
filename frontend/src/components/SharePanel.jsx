@@ -15,10 +15,19 @@ export default function SharePanel({ positionId, position }) {
   const [copied, setCopied] = useState(false)
   const [imgOk, setImgOk] = useState(true)
 
+  // Cache-buster: Telegram + X cache OG previews per exact URL for ~7 days.
+  // Using the current IL mark as a version param makes the URL change whenever
+  // the position state changes — forcing crawlers to re-fetch and pick up the
+  // fresh OG card. Also bypasses any stale cache from earlier broken deploys.
+  const cacheBuster = useMemo(() => {
+    const mark = position?.ilMarkBps !== undefined ? Math.abs(Number(position.ilMarkBps)) : 0
+    return `${positionId}-${mark}`
+  }, [positionId, position?.ilMarkBps])
+
   const shareUrl = useMemo(() => {
     if (typeof window === 'undefined') return ''
-    return `${window.location.origin}/positions/${positionId}`
-  }, [positionId])
+    return `${window.location.origin}/positions/${positionId}?v=${cacheBuster}`
+  }, [positionId, cacheBuster])
 
   const ogUrl = useMemo(() => {
     if (typeof window === 'undefined') return ''
