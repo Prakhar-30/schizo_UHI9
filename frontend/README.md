@@ -54,8 +54,9 @@ logs, which public RPCs sometimes rate-limit.
 Position pages (`/positions/:id`) generate per-position [Open Graph](https://ogp.me) cards so X /
 Telegram / Discord / iMessage unfurl them automatically.
 
-- **Image renderer** — `api/og.jsx` (Vercel Edge Function, `@vercel/og`). Reads the position
-  straight from Sepolia and renders a 1200×630 PNG.
+- **Image renderer** — `api/og.js` (Vercel Edge Function, `@vercel/og`, plain JS + `React.createElement`
+  so Vercel's TS check doesn't run on it). Reads the position straight from Sepolia and renders a
+  1200×630 PNG.
 - **Meta injection** — `middleware.js` rewrites the SPA HTML for `/positions/:id` so the og:image /
   twitter:image tags are present *before* JS runs (social crawlers don't execute JS).
 - **Routing** — `vercel.json` rewrites everything except `/api/*` to `/index.html`.
