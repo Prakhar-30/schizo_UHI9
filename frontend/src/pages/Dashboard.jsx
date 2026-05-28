@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useAccount } from 'wagmi'
 import { ADDR, HOOK_ABI } from '../config/contracts'
 import { usePositions, useTokenInfo, useWithdrawable, useHookCounters } from '../hooks/reads'
@@ -9,6 +9,7 @@ import { Card } from '../components/ui/Card'
 import { Kicker, Chip, Leg, Divider, SectionHead } from '../components/ui/Bits'
 import Button from '../components/ui/Button'
 import PositionCard from '../components/PositionCard'
+import SharePanel from '../components/SharePanel'
 import WalletButton from '../components/layout/WalletButton'
 import { Mark } from '../components/layout/Logo'
 
@@ -46,6 +47,20 @@ export default function Dashboard() {
   )
   const feeLegs = mine.filter((p) => isSameAddr(address, p.feeHolder) && p.active).length
   const ilLegs = mine.filter((p) => isSameAddr(address, p.ilHolder) && p.active).length
+
+  // Pick the user's most recent active position as the default for the share panel.
+  const shareable = useMemo(
+    () => mine.filter((p) => p.active).sort((a, b) => b.id - a.id),
+    [mine],
+  )
+  const [shareId, setShareId] = useState(null)
+  useEffect(() => {
+    if (shareId === null && shareable.length > 0) setShareId(shareable[0].id)
+    if (shareId !== null && !shareable.some((p) => p.id === shareId) && shareable.length > 0) {
+      setShareId(shareable[0].id)
+    }
+  }, [shareable, shareId])
+  const sharePosition = shareable.find((p) => p.id === shareId) || null
 
   const has0 = amount0 !== undefined && amount0 > 0n
   const has1 = amount1 !== undefined && amount1 > 0n
@@ -118,6 +133,37 @@ export default function Dashboard() {
           </p>
         )}
       </Card>
+
+      {/* dedicated share section */}
+      {shareable.length > 0 && sharePosition && (
+        <Card className="mt-6 p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <Kicker>Cast your bonds</Kicker>
+              <h3 className="mt-1 font-black text-xl tracking-tight">Share to X</h3>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-bone/40">position</span>
+              {shareable.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setShareId(p.id)}
+                  className={`rounded-md border-2 px-3 py-1 font-mono text-xs font-bold transition-colors ${
+                    p.id === shareId
+                      ? 'border-volt bg-volt/10 text-volt'
+                      : 'border-white/15 text-bone/60 hover:border-white/35 hover:text-bone'
+                  }`}
+                >
+                  #{p.id}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-5">
+            <SharePanel positionId={sharePosition.id} position={sharePosition} embedded />
+          </div>
+        </Card>
+      )}
 
       {/* my positions */}
       <div className="mt-10">

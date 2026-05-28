@@ -118,12 +118,9 @@ export default function SharePanel({ positionId, position, embedded = false }) {
       </div>
 
       {/* buttons */}
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button href={tweetHref} variant="bone" size="sm" className="flex-1">
-          Share on X →
-        </Button>
-        <Button href={ogUrl} variant="ghost" size="sm">
-          Open card image ↗
+      <div className="mt-3">
+        <Button href={tweetHref} variant="bone" size="md" className="w-full">
+          Post on X →
         </Button>
       </div>
 

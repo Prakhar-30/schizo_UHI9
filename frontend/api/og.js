@@ -5,8 +5,6 @@ import { sepolia } from 'viem/chains'
 
 export const config = { runtime: 'edge' }
 
-// Kept in sync with frontend/src/config/contracts.js — duplicated here so the
-// edge bundle has zero coupling to the Vite src tree.
 const HOOK = '0x55f571E0DC76De9154DeA40B4749a6449CF510C0'
 const RPC = process.env.SEPOLIA_RPC || 'https://ethereum-sepolia-rpc.publicnode.com'
 
@@ -41,14 +39,17 @@ function fmtBpsPct(bps) {
   return (n > 0 ? '+' : '') + n.toFixed(2) + '%'
 }
 
-// All Satori containers need display:flex — there is no implicit block layout.
-// Helper sets that default so individual call sites can override.
+// Every Satori container needs an explicit display value — there is no implicit
+// block layout. Helper sets display:flex so individual call sites can override.
 const box = (style, ...kids) => h('div', { style: { display: 'flex', ...style } }, ...kids)
 
 function Stat(label, value, color) {
   return box(
-    { flexDirection: 'column', flex: 1, gap: 6, minWidth: 0 },
-    box({ fontSize: 16, color: C.mute, textTransform: 'uppercase', letterSpacing: '0.32em', fontWeight: 700 }, label),
+    { flexDirection: 'column', flex: 1, gap: 8, minWidth: 0 },
+    box(
+      { fontSize: 16, color: C.mute, textTransform: 'uppercase', letterSpacing: '0.32em', fontWeight: 700 },
+      label,
+    ),
     box({ fontSize: 44, fontWeight: 800, color, letterSpacing: -1 }, value),
   )
 }
@@ -91,12 +92,13 @@ export default async function handler(req) {
         height: '100%',
         background: C.ink,
         color: C.bone,
-        padding: 64,
+        padding: 56,
         fontFamily: 'sans-serif',
         position: 'relative',
+        justifyContent: 'space-between', // top group hugs top, footer hugs bottom
       },
 
-      // faint grid background
+      // ── background atmosphere ───────────────────────────────────────────
       box({
         position: 'absolute',
         top: 0,
@@ -108,8 +110,6 @@ export default async function handler(req) {
         backgroundSize: '60px 60px',
         opacity: 0.5,
       }),
-
-      // colored glow
       box({
         position: 'absolute',
         right: -120,
@@ -119,83 +119,84 @@ export default async function handler(req) {
         background: 'radial-gradient(circle at center, ' + ilColor + '33, transparent 70%)',
       }),
 
-      // top bar
+      // ── top group ───────────────────────────────────────────────────────
       box(
-        { alignItems: 'center', gap: 18 },
-        box({
-          width: 56,
-          height: 56,
-          borderRadius: 14,
-          background: 'linear-gradient(135deg,' + C.volt + ',' + C.risk + ')',
-          boxShadow: '4px 4px 0 0 #000',
-        }),
-        box({ fontSize: 40, fontWeight: 900, letterSpacing: -1 }, 'schizō'),
-        box(
-          {
-            marginLeft: 'auto',
-            alignItems: 'center',
-            gap: 10,
-            padding: '8px 14px',
-            border: '2px solid ' + C.volt + '66',
-            color: C.volt,
-            borderRadius: 8,
-            fontSize: 18,
-            fontWeight: 700,
-            letterSpacing: '0.2em',
-            textTransform: 'uppercase',
-          },
-          box({ width: 8, height: 8, background: C.volt, borderRadius: '50%' }),
-          box({}, 'Reactive Network'),
-        ),
-      ),
+        { flexDirection: 'column', gap: 36 },
 
-      // id + chip
-      box(
-        { flexDirection: 'column', marginTop: 32 },
+        // top bar
         box(
-          { fontSize: 20, color: C.mute, textTransform: 'uppercase', letterSpacing: '0.32em', fontWeight: 700 },
-          'IL Bond Position',
-        ),
-        box(
-          { alignItems: 'center', gap: 24, marginTop: 4 },
-          box({ fontSize: 150, fontWeight: 900, lineHeight: 0.95, letterSpacing: -5 }, '#' + id),
+          { alignItems: 'center', gap: 18 },
+          box({
+            width: 56,
+            height: 56,
+            borderRadius: 14,
+            background: 'linear-gradient(135deg,' + C.volt + ',' + C.risk + ')',
+            boxShadow: '4px 4px 0 0 #000',
+          }),
+          box({ fontSize: 40, fontWeight: 900, letterSpacing: -1 }, 'schizō'),
           box(
             {
-              padding: '10px 18px',
-              border: '2px solid ' + statusColor,
-              color: statusColor,
-              borderRadius: 10,
-              fontSize: 22,
+              marginLeft: 'auto',
+              alignItems: 'center',
+              gap: 10,
+              padding: '8px 14px',
+              border: '2px solid ' + C.volt + '66',
+              color: C.volt,
+              borderRadius: 8,
+              fontSize: 18,
               fontWeight: 700,
-              letterSpacing: '0.18em',
-              marginBottom: 6,
+              letterSpacing: '0.2em',
+              textTransform: 'uppercase',
             },
-            statusLabel,
+            box({ width: 8, height: 8, background: C.volt, borderRadius: '50%' }),
+            box({}, 'Reactive Network'),
           ),
+        ),
+
+        // id + chip
+        box(
+          { flexDirection: 'column' },
+          box(
+            { fontSize: 20, color: C.mute, textTransform: 'uppercase', letterSpacing: '0.32em', fontWeight: 700 },
+            'IL Bond Position',
+          ),
+          box(
+            { alignItems: 'center', gap: 24, marginTop: 4 },
+            box({ fontSize: 140, fontWeight: 900, lineHeight: 0.95, letterSpacing: -5 }, '#' + id),
+            box(
+              {
+                padding: '10px 18px',
+                border: '2px solid ' + statusColor,
+                color: statusColor,
+                borderRadius: 10,
+                fontSize: 22,
+                fontWeight: 700,
+                letterSpacing: '0.18em',
+                marginBottom: 6,
+              },
+              statusLabel,
+            ),
+          ),
+        ),
+
+        // stats grid
+        box(
+          {
+            gap: 20,
+            border: '2px solid ' + C.line,
+            borderRadius: 16,
+            background: C.card,
+            padding: 24,
+          },
+          Stat('Premium', pos ? fmtBeta(pos.askPremium) + ' BETA' : '—', C.yield),
+          box({ width: 2, background: C.line }),
+          Stat('IL Mark', pos ? fmtBpsPct(pos.ilMarkBps) : '—', ilColor),
+          box({ width: 2, background: C.line }),
+          Stat('Liquidity', pos ? fmtBeta(pos.liquidity) : '—', C.bone),
         ),
       ),
 
-      // stats grid
-      box(
-        {
-          gap: 20,
-          marginTop: 28,
-          border: '2px solid ' + C.line,
-          borderRadius: 16,
-          background: C.card,
-          padding: 22,
-        },
-        Stat('Premium', pos ? fmtBeta(pos.askPremium) + ' BETA' : '—', C.yield),
-        box({ width: 2, background: C.line }),
-        Stat('IL Mark', pos ? fmtBpsPct(pos.ilMarkBps) : '—', ilColor),
-        box({ width: 2, background: C.line }),
-        Stat('Liquidity', pos ? fmtBeta(pos.liquidity) : '—', C.bone),
-      ),
-
-      // flex spacer (marginTop: auto can be unreliable in Satori)
-      box({ flex: 1 }),
-
-      // footer
+      // ── footer (hugs bottom via justifyContent on parent) ───────────────
       box(
         { alignItems: 'center', justifyContent: 'space-between' },
         box(
