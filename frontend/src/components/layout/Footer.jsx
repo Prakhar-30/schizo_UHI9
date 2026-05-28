@@ -5,9 +5,9 @@ import { Addr, Divider } from '../ui/Bits'
 
 export default function Footer() {
   return (
-    <footer className="relative mt-24 border-t-2 border-white/10">
-      <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-        <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1.2fr]">
+    <footer className="relative mt-16 border-t-2 border-white/10 sm:mt-24">
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14">
+        <div className="grid gap-8 sm:gap-10 md:grid-cols-[1.4fr_1fr_1fr_1.2fr]">
           <div>
             <div className="flex items-center gap-2.5">
               <Mark size={30} />
@@ -52,23 +52,23 @@ export default function Footer() {
             </ul>
           </div>
 
-          <div>
+          <div className="min-w-0">
             <p className="kicker mb-4">Contracts</p>
             <ul className="space-y-2.5 text-sm">
               <li className="flex items-center justify-between gap-2">
-                <span className="text-bone/45">Hook</span>
+                <span className="shrink-0 text-bone/45">Hook</span>
                 <Addr value={ADDR.hook} href={sepoliaAddr(ADDR.hook)} />
               </li>
               <li className="flex items-center justify-between gap-2">
-                <span className="text-bone/45">Reactive</span>
+                <span className="shrink-0 text-bone/45">Reactive</span>
                 <Addr value={ADDR.reactive} href={reactscanAddr(ADDR.reactive)} />
               </li>
               <li className="flex items-center justify-between gap-2">
-                <span className="text-bone/45">ALPHA</span>
+                <span className="shrink-0 text-bone/45">ALPHA</span>
                 <Addr value={ADDR.token0} href={sepoliaAddr(ADDR.token0)} />
               </li>
               <li className="flex items-center justify-between gap-2">
-                <span className="text-bone/45">BETA</span>
+                <span className="shrink-0 text-bone/45">BETA</span>
                 <Addr value={ADDR.token1} href={sepoliaAddr(ADDR.token1)} />
               </li>
             </ul>

@@ -62,12 +62,12 @@ export default function Dashboard() {
   if (!isConnected) return <ConnectGate />
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <Kicker>Dashboard</Kicker>
-          <h1 className="mt-2 font-black text-4xl tracking-tight sm:text-5xl">Your positions</h1>
-          <p className="mt-2 font-mono text-sm text-bone/45">{shortAddr(address)} · Ethereum Sepolia</p>
+          <h1 className="mt-2 font-black text-3xl tracking-tight sm:text-5xl">Your positions</h1>
+          <p className="mt-2 font-mono text-xs text-bone/45 sm:text-sm">{shortAddr(address)} · Ethereum Sepolia</p>
         </div>
         <Button to="/create" variant="bone" size="md">
           + New bond
@@ -83,30 +83,30 @@ export default function Dashboard() {
       </div>
 
       {/* withdrawable */}
-      <Card className="mt-6 p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
+      <Card className="mt-6 p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4 md:items-center">
+          <div className="min-w-0">
             <Kicker>Claimable from the hook</Kicker>
-            <div className="mt-2 flex items-baseline gap-4">
-              <span className="font-mono text-2xl font-bold tabular-nums text-yield">{fmtToken(amount0)} ALPHA</span>
+            <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              <span className="font-mono text-xl font-bold tabular-nums text-yield sm:text-2xl">{fmtToken(amount0)} ALPHA</span>
               <span className="text-bone/20">+</span>
-              <span className="font-mono text-2xl font-bold tabular-nums text-risk">{fmtToken(amount1)} BETA</span>
+              <span className="font-mono text-xl font-bold tabular-nums text-risk sm:text-2xl">{fmtToken(amount1)} BETA</span>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto">
             {nothing ? (
               <Chip color="white">nothing to claim</Chip>
             ) : hasBoth ? (
               <>
-                <Button variant="yield" size="md" loading={pending} onClick={() => withdraw(ADDR.token0)}>
+                <Button variant="yield" size="md" className="flex-1 sm:flex-none" loading={pending} onClick={() => withdraw(ADDR.token0)}>
                   Claim as ALPHA
                 </Button>
-                <Button variant="risk" size="md" loading={pending} onClick={() => withdraw(ADDR.token1)}>
+                <Button variant="risk" size="md" className="flex-1 sm:flex-none" loading={pending} onClick={() => withdraw(ADDR.token1)}>
                   Claim as BETA
                 </Button>
               </>
             ) : (
-              <Button variant="bone" size="md" loading={pending} onClick={() => withdraw(has1 ? ADDR.token1 : ADDR.token0)}>
+              <Button variant="bone" size="md" className="w-full sm:w-auto" loading={pending} onClick={() => withdraw(has1 ? ADDR.token1 : ADDR.token0)}>
                 Withdraw
               </Button>
             )}

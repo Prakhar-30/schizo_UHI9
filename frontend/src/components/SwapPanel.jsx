@@ -89,8 +89,8 @@ export default function SwapPanel({ onSwapped }) {
   }
 
   return (
-    <Card glow="volt" className="p-6">
-      <div className="flex items-center justify-between">
+    <Card glow="volt" className="p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Kicker>Drive the oracle</Kicker>
         <Chip color="volt">
           <Dot color="volt" pulse /> triggers RSC
@@ -115,7 +115,7 @@ export default function SwapPanel({ onSwapped }) {
               min="0"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="min-w-0 flex-1 bg-transparent font-mono text-2xl font-bold text-bone outline-none"
+              className="min-w-0 flex-1 bg-transparent font-mono text-xl font-bold text-bone outline-none sm:text-2xl"
               placeholder="0.0"
             />
             <span
@@ -139,7 +139,7 @@ export default function SwapPanel({ onSwapped }) {
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
           <span className="kicker">You receive</span>
           <div className="mt-1 flex items-center justify-between">
-            <span className="font-mono text-2xl font-bold text-bone/40">~ market</span>
+            <span className="font-mono text-xl font-bold text-bone/40 sm:text-2xl">~ market</span>
             <span className={`chip ${zeroForOne ? 'border-risk/60 text-risk' : 'border-yield/60 text-yield'} text-sm`}>
               {symOut}
             </span>

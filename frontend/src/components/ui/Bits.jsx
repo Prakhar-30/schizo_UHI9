@@ -44,10 +44,10 @@ export function Spinner({ className = '' }) {
 export function SectionHead({ kicker, title, sub, right, className = '' }) {
   return (
     <div className={`flex flex-wrap items-end justify-between gap-4 ${className}`}>
-      <div>
+      <div className="min-w-0">
         {kicker && <Kicker className="mb-2 block">{kicker}</Kicker>}
-        <h2 className="font-black text-3xl sm:text-4xl tracking-tight leading-none">{title}</h2>
-        {sub && <p className="mt-3 max-w-xl text-bone/55 text-sm leading-relaxed">{sub}</p>}
+        <h2 className="font-black text-2xl tracking-tight leading-none sm:text-4xl">{title}</h2>
+        {sub && <p className="mt-3 max-w-xl text-sm leading-relaxed text-bone/55">{sub}</p>}
       </div>
       {right}
     </div>

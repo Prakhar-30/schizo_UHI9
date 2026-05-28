@@ -30,7 +30,7 @@ function HuntRow({ position, marked, busyId, onBuy }) {
   const busy = busyId === id
 
   return (
-    <Card className="flex flex-col gap-4 p-5 transition-colors hover:border-volt/30 md:flex-row md:items-center">
+    <Card className="flex flex-col gap-4 p-4 transition-colors hover:border-volt/30 sm:p-5 md:flex-row md:items-center">
       {/* id + lp */}
       <div className="flex items-center gap-3 md:w-32">
         <span className="font-black text-2xl">#{id}</span>
@@ -45,18 +45,18 @@ function HuntRow({ position, marked, busyId, onBuy }) {
       </div>
 
       {/* numbers */}
-      <div className="grid flex-1 grid-cols-3 gap-3">
-        <div>
-          <p className="kicker">Premium</p>
-          <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-yield">
+      <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="min-w-0">
+          <p className="kicker truncate">Premium</p>
+          <p className="mt-0.5 truncate font-mono text-base font-bold tabular-nums text-yield">
             {fmtToken(askPremium)} BETA
           </p>
         </div>
-        <div>
-          <p className="kicker">Liquidity</p>
-          <p className="mt-0.5 font-mono text-sm font-bold tabular-nums">{fmtToken(liquidity)}</p>
+        <div className="min-w-0">
+          <p className="kicker truncate">Liquidity</p>
+          <p className="mt-0.5 truncate font-mono text-sm font-bold tabular-nums">{fmtToken(liquidity)}</p>
         </div>
-        <div>
+        <div className="col-span-2 min-w-0 sm:col-span-1">
           <p className="kicker">Listed by</p>
           <Addr value={lp} href={sepoliaAddr(lp)} className="mt-0.5" />
         </div>
@@ -163,15 +163,15 @@ export default function Hunt() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
       {/* header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <Kicker>Hunt mode</Kicker>
-          <h1 className="mt-2 font-black text-4xl tracking-tight sm:text-5xl">
+          <h1 className="mt-2 font-black text-balance text-3xl tracking-tight sm:text-5xl">
             Buyable <span className="text-risk">IL-T</span> bonds
           </h1>
-          <p className="mt-3 max-w-2xl text-bone/55">
+          <p className="mt-3 max-w-2xl text-sm text-bone/55 sm:text-base">
             Every open position whose risk leg hasn't been sold yet — collected in one place. Pick a premium, take the
             price risk, collect the LP composition on exit.
           </p>
@@ -212,8 +212,8 @@ export default function Hunt() {
       </div>
 
       {/* controls */}
-      <div className="mt-8 flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-ink-soft/40 p-4">
-        <div className="flex-1 min-w-[14rem]">
+      <div className="mt-8 flex flex-col gap-3 rounded-2xl border border-white/10 bg-ink-soft/40 p-4 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="w-full flex-1 sm:min-w-[14rem]">
           <Input
             placeholder="Search by ID or address…"
             value={query}
@@ -223,7 +223,7 @@ export default function Hunt() {
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value)}
-          className="rounded-md border-2 border-white/15 bg-ink-card px-3 py-2.5 font-mono text-sm text-bone focus:border-volt focus:outline-none"
+          className="w-full rounded-md border-2 border-white/15 bg-ink-card px-3 py-2.5 font-mono text-sm text-bone focus:border-volt focus:outline-none sm:w-auto"
         >
           {SORTS.map((s) => (
             <option key={s.key} value={s.key}>
@@ -231,21 +231,23 @@ export default function Hunt() {
             </option>
           ))}
         </select>
-        <label className="flex items-center gap-2 font-mono text-[12px] uppercase tracking-wider text-bone/60">
-          <input
-            type="checkbox"
-            checked={hideMine}
-            onChange={(e) => setHideMine(e.target.checked)}
-            className="h-4 w-4 accent-volt"
-          />
-          hide mine
-        </label>
-        <button
-          onClick={refetch}
-          className="font-mono text-[11px] uppercase tracking-wider text-bone/40 hover:text-volt"
-        >
-          ↻ refresh
-        </button>
+        <div className="flex items-center justify-between gap-3 sm:gap-4">
+          <label className="flex items-center gap-2 font-mono text-[12px] uppercase tracking-wider text-bone/60">
+            <input
+              type="checkbox"
+              checked={hideMine}
+              onChange={(e) => setHideMine(e.target.checked)}
+              className="h-4 w-4 accent-volt"
+            />
+            hide mine
+          </label>
+          <button
+            onClick={refetch}
+            className="font-mono text-[11px] uppercase tracking-wider text-bone/40 hover:text-volt"
+          >
+            ↻ refresh
+          </button>
+        </div>
       </div>
 
       {/* connect notice */}
@@ -296,8 +298,8 @@ export default function Hunt() {
       </div>
 
       {/* footer helper */}
-      <div className="mt-12 rounded-2xl border border-white/10 bg-ink-soft/30 p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="mt-10 rounded-2xl border border-white/10 bg-ink-soft/30 p-5 sm:mt-12 sm:p-6">
+        <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
           <div className="max-w-xl">
             <Kicker>What you're buying</Kicker>
             <p className="mt-2 text-sm leading-relaxed text-bone/60">
@@ -306,7 +308,7 @@ export default function Hunt() {
               your exposure after every swap, so you always see the live mark.
             </p>
           </div>
-          <Button to="/markets" variant="outline" size="md">
+          <Button to="/markets" variant="outline" size="md" className="w-full md:w-auto">
             See full book ↗
           </Button>
         </div>

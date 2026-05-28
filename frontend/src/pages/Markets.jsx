@@ -38,13 +38,13 @@ export default function Markets() {
   const reactBal = rsc.balance !== undefined ? (Number(rsc.balance) / 1e18).toFixed(3) : '—'
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
       {/* header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <Kicker>Live markets</Kicker>
-          <h1 className="mt-2 font-black text-4xl tracking-tight sm:text-5xl">The IL bond book</h1>
-          <p className="mt-3 max-w-xl text-bone/55">
+          <h1 className="mt-2 font-black text-balance text-3xl tracking-tight sm:text-5xl">The IL bond book</h1>
+          <p className="mt-3 max-w-xl text-sm text-bone/55 sm:text-base">
             Every open position on the hook, with the impermanent-loss mark the Reactive Network posts on each swap.
           </p>
         </div>
@@ -87,7 +87,7 @@ export default function Markets() {
       {/* body */}
       <div className="mt-10 grid gap-8 lg:grid-cols-[1.55fr_1fr]">
         {/* positions */}
-        <div>
+        <div className="order-2 lg:order-1">
           <SectionHead
             kicker="Order book"
             title="Positions"
@@ -116,7 +116,7 @@ export default function Markets() {
         </div>
 
         {/* aside */}
-        <aside className="space-y-6 lg:sticky lg:top-20 lg:self-start">
+        <aside className="order-1 space-y-6 lg:sticky lg:top-20 lg:order-2 lg:self-start">
           <SwapPanel onSwapped={onSwapped} />
 
           <Card className="p-6">

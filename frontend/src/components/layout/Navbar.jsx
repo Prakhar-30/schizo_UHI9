@@ -34,7 +34,7 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-50">
       <div className="glass border-b border-white/10">
-        <div className="mx-auto flex h-16 max-w-8xl items-center justify-between gap-3 px-4 sm:px-6">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-3 sm:gap-3 sm:px-6">
           <Logo />
 
           <nav className="hidden items-center gap-4 md:flex">
@@ -46,9 +46,10 @@ export default function Navbar() {
           <div className="flex items-center gap-2">
             <WalletButton />
             <button
-              className="grid h-9 w-9 place-items-center rounded-md border-2 border-white/15 text-bone md:hidden"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-md border-2 border-white/15 text-bone md:hidden"
               onClick={() => setOpen((v) => !v)}
               aria-label="menu"
+              aria-expanded={open}
             >
               <div className="space-y-1">
                 <span className={`block h-0.5 w-4 bg-bone transition-transform ${open ? 'translate-y-1.5 rotate-45' : ''}`} />
@@ -60,7 +61,7 @@ export default function Navbar() {
         </div>
 
         {open && (
-          <nav className="flex flex-col gap-1 border-t border-white/10 px-4 py-3 md:hidden">
+          <nav className="flex flex-col gap-1 border-t border-white/10 bg-ink/95 px-4 py-3 backdrop-blur-xl md:hidden">
             {LINKS.map((l) => (
               <Item key={l.to} {...l} onClick={() => setOpen(false)} />
             ))}

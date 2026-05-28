@@ -17,7 +17,7 @@ const hookBase = { address: ADDR.hook, abi: HOOK_ABI }
 
 function HolderRow({ kind, label, holder, mine }) {
   return (
-    <div className="flex items-center justify-between gap-2 py-2">
+    <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 py-2">
       <Leg kind={kind} />
       <div className="flex items-center gap-2">
         {mine && <span className="font-mono text-[10px] uppercase tracking-wider text-volt">you</span>}
@@ -87,7 +87,7 @@ export default function PositionCard({ position, marked = true, onAction }) {
   }
 
   return (
-    <Card className="flex flex-col p-5">
+    <Card className="flex flex-col p-4 sm:p-5">
       {/* header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

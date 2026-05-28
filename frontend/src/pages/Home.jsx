@@ -8,9 +8,9 @@ import SplitDiagram from '../components/SplitDiagram'
 
 function HeroStat({ label, value, accent }) {
   return (
-    <div className="px-5 py-3">
-      <div className={`font-mono text-2xl font-bold tabular-nums ${accent}`}>{value}</div>
-      <div className="kicker mt-0.5">{label}</div>
+    <div className="px-4 py-3 sm:px-5">
+      <div className={`font-mono text-xl font-bold tabular-nums sm:text-2xl ${accent}`}>{value}</div>
+      <div className="kicker mt-0.5 truncate">{label}</div>
     </div>
   )
 }
@@ -22,8 +22,8 @@ export default function Home() {
   return (
     <div>
       {/* ── HERO ─────────────────────────────────────────────── */}
-      <section className="relative mx-auto max-w-7xl px-4 pb-10 pt-16 sm:px-6 sm:pt-24">
-        <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
+      <section className="relative mx-auto max-w-7xl px-4 pb-8 pt-10 sm:px-6 sm:pb-10 sm:pt-24">
+        <div className="grid items-center gap-8 sm:gap-12 lg:grid-cols-[1.1fr_0.9fr]">
           <div>
             <div className="mb-6 inline-flex items-center gap-2">
               <Chip color="volt">
@@ -31,7 +31,7 @@ export default function Home() {
               </Chip>
             </div>
 
-            <h1 className="font-black leading-[0.92] tracking-tight text-5xl sm:text-6xl lg:text-7xl">
+            <h1 className="font-black leading-[0.95] tracking-tight text-balance text-4xl sm:text-6xl lg:text-7xl">
               LP fees.
               <br />
               Without the{' '}
@@ -44,11 +44,11 @@ export default function Home() {
               .
             </h1>
 
-            <p className="mt-7 max-w-md text-lg leading-relaxed text-bone/65">
+            <p className="mt-6 max-w-md text-base leading-relaxed text-bone/65 sm:mt-7 sm:text-lg">
               Pay someone else to take your impermanent loss. Keep the yield.
             </p>
 
-            <div className="mt-9 flex flex-wrap gap-3">
+            <div className="mt-7 flex flex-wrap gap-3 sm:mt-9">
               <Button to="/create" variant="bone" size="lg">
                 Sell your risk →
               </Button>
@@ -61,10 +61,10 @@ export default function Home() {
           {/* hero panel */}
           <div className="relative">
             <div className="absolute -inset-4 rounded-[2rem] bg-gradient-to-br from-volt/20 via-transparent to-risk/20 blur-2xl" />
-            <Card glow="volt" className="relative overflow-hidden p-7">
-              <div className="flex items-center justify-between">
+            <Card glow="volt" className="relative overflow-hidden p-5 sm:p-7">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <Kicker>Live on Sepolia + Lasna</Kicker>
-                <span className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-bone/50">
+                <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-bone/50 sm:text-[11px]">
                   <Dot color={rsc.online ? 'mint' : 'amber'} pulse={rsc.online} />
                   {rsc.online ? 'RSC online' : 'RSC syncing'}
                 </span>
@@ -108,10 +108,10 @@ export default function Home() {
       </div>
 
       {/* ── THE SPLIT ────────────────────────────────────────── */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
-        <div className="mx-auto mb-12 max-w-2xl text-center">
+      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16">
+        <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-12">
           <Kicker>The primitive</Kicker>
-          <h2 className="mt-3 font-black text-4xl tracking-tight sm:text-5xl">One position, two markets</h2>
+          <h2 className="mt-3 font-black text-3xl tracking-tight sm:text-5xl">One position, two markets</h2>
           <p className="mt-4 text-bone/55">
             Deposit liquidity once. Walk away with two independent claims that anyone can hold, price, and trade.
           </p>
@@ -120,9 +120,9 @@ export default function Home() {
       </section>
 
       {/* ── HOW ──────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
+      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16">
         <Kicker>How it flows</Kicker>
-        <h2 className="mt-3 font-black text-4xl tracking-tight">Four moves</h2>
+        <h2 className="mt-3 font-black text-3xl tracking-tight sm:text-4xl">Four moves</h2>
         <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
           {[
             { n: '01', t: 'Deposit', d: 'Add your tokens and set a premium. You get both pieces — FEE-T and IL-T — to start.', c: 'volt' },
@@ -140,14 +140,14 @@ export default function Home() {
       </section>
 
       {/* ── REACTIVE ─────────────────────────────────────────── */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
+      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16">
         <Card className="overflow-hidden p-0">
           <div className="grid lg:grid-cols-2">
-            <div className="p-8 sm:p-10">
+            <div className="p-6 sm:p-10">
               <Chip color="volt">
                 <Dot color="volt" pulse /> The unfair advantage
               </Chip>
-              <h2 className="mt-5 font-black text-3xl tracking-tight sm:text-4xl">
+              <h2 className="mt-5 font-black text-balance text-2xl tracking-tight sm:text-4xl">
                 IL math doesn't belong on the swap path
               </h2>
               <p className="mt-4 text-bone/60 leading-relaxed">
@@ -171,9 +171,9 @@ export default function Home() {
                 Read the architecture
               </Button>
             </div>
-            <div className="relative grid place-items-center border-t-2 border-white/10 bg-ink-soft/40 p-10 lg:border-l-2 lg:border-t-0">
+            <div className="relative grid place-items-center overflow-x-auto border-t-2 border-white/10 bg-ink-soft/40 p-6 sm:p-10 lg:border-l-2 lg:border-t-0">
               <div className="absolute inset-0 grid-bg opacity-40" />
-              <pre className="relative font-mono text-[11px] leading-relaxed text-bone/70 sm:text-xs">
+              <pre className="relative font-mono text-[10px] leading-relaxed text-bone/70 sm:text-xs">
 {`Sepolia                  Lasna
 ┌────────────┐  swap   ┌────────────┐
 │ ILBondHook │ ──────▶ │ ILBond     │
@@ -189,10 +189,10 @@ export default function Home() {
       </section>
 
       {/* ── CTA ──────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
-        <div className="card glow-risk relative overflow-hidden p-10 text-center sm:p-16">
+      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16">
+        <div className="card glow-risk relative overflow-hidden p-6 text-center sm:p-16">
           <div className="absolute inset-0 grid-bg opacity-30" />
-          <h2 className="relative font-black text-4xl tracking-tight sm:text-5xl">Stop owning risk you didn't want.</h2>
+          <h2 className="relative font-black text-balance text-3xl tracking-tight sm:text-5xl">Stop owning risk you didn't want.</h2>
           <p className="relative mx-auto mt-4 max-w-lg text-bone/55">
             Mint your first bond on Sepolia in under a minute. Test tokens are one click away.
           </p>

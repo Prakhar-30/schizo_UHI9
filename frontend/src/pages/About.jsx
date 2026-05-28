@@ -23,16 +23,16 @@ const FAQ = [
 
 function Step({ i, t, d, tag }) {
   return (
-    <div className="flex gap-5">
+    <div className="flex gap-4 sm:gap-5">
       <div className="flex flex-col items-center">
-        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border-2 border-white/15 bg-ink-card font-black text-lg">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border-2 border-white/15 bg-ink-card font-black text-base sm:h-11 sm:w-11 sm:text-lg">
           {String(i + 1).padStart(2, '0')}
         </div>
         {i < STEPS.length - 1 && <div className="mt-1 w-px flex-1 bg-white/10" />}
       </div>
-      <div className="pb-8">
-        <div className="flex items-center gap-2">
-          <h4 className="font-bold text-lg">{t}</h4>
+      <div className="min-w-0 pb-8">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <h4 className="font-bold text-base sm:text-lg">{t}</h4>
           <span className="font-mono text-[10px] uppercase tracking-wider text-volt">{tag}</span>
         </div>
         <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-bone/55">{d}</p>
@@ -51,13 +51,13 @@ const CONTRACTS = [
 
 export default function About() {
   return (
-    <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
+    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
       {/* intro */}
       <div className="max-w-3xl">
         <Chip color="volt">
           <Dot color="volt" pulse /> UHI9 · Theme: Impermanent Loss
         </Chip>
-        <h1 className="mt-5 font-black text-4xl leading-[0.95] tracking-tight sm:text-6xl">
+        <h1 className="mt-5 font-black text-balance text-3xl leading-[1] tracking-tight sm:text-5xl lg:text-6xl">
           LP yield, without impermanent loss.
         </h1>
         <p className="mt-6 text-lg leading-relaxed text-bone/60">
@@ -90,14 +90,14 @@ export default function About() {
       {/* split */}
       <div className="mt-16">
         <Kicker>The split</Kicker>
-        <h2 className="mb-8 mt-2 font-black text-3xl tracking-tight">Anatomy of a bond</h2>
+        <h2 className="mb-8 mt-2 font-black text-2xl tracking-tight sm:text-3xl">Anatomy of a bond</h2>
         <SplitDiagram />
       </div>
 
       {/* architecture */}
       <div className="mt-16">
         <Kicker>Architecture</Kicker>
-        <h2 className="mt-2 font-black text-3xl tracking-tight">Two contracts, two chains</h2>
+        <h2 className="mt-2 font-black text-2xl tracking-tight sm:text-3xl">Two contracts, two chains</h2>
         <Card className="mt-6 overflow-hidden p-0">
           <div className="grid md:grid-cols-2">
             <div className="border-b-2 border-white/10 p-7 md:border-b-0 md:border-r-2">
@@ -139,7 +139,7 @@ export default function About() {
       {/* guide */}
       <div className="mt-16">
         <Kicker>Step by step</Kicker>
-        <h2 className="mt-2 font-black text-3xl tracking-tight">How to use schizō</h2>
+        <h2 className="mt-2 font-black text-2xl tracking-tight sm:text-3xl">How to use schizō</h2>
         <div className="mt-8">
           {STEPS.map((s, i) => (
             <Step key={s.t} i={i} {...s} />
@@ -154,7 +154,7 @@ export default function About() {
       {/* faq */}
       <div className="mt-16">
         <Kicker>FAQ</Kicker>
-        <h2 className="mt-2 font-black text-3xl tracking-tight">Good questions</h2>
+        <h2 className="mt-2 font-black text-2xl tracking-tight sm:text-3xl">Good questions</h2>
         <div className="mt-6 space-y-3">
           {FAQ.map((f) => (
             <details key={f.q} className="card group p-5">
@@ -171,10 +171,10 @@ export default function About() {
       {/* contracts */}
       <div className="mt-16">
         <Kicker>Deployed contracts</Kicker>
-        <h2 className="mt-2 font-black text-3xl tracking-tight">On-chain, verifiable</h2>
+        <h2 className="mt-2 font-black text-2xl tracking-tight sm:text-3xl">On-chain, verifiable</h2>
         <Card className="mt-6 divide-y divide-white/8 p-2">
           {CONTRACTS.map((c) => (
-            <div key={c.label} className="flex items-center justify-between gap-3 px-4 py-3.5">
+            <div key={c.label} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3.5">
               <div className="flex items-center gap-3">
                 <span className="font-mono text-sm font-bold">{c.label}</span>
                 <Chip color={c.net === 'Lasna' ? 'volt' : 'mint'}>{c.net}</Chip>

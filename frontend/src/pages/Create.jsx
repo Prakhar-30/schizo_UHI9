@@ -126,11 +126,11 @@ export default function Create() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-      <div className="mb-10">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+      <div className="mb-8 sm:mb-10">
         <Kicker>Creator console</Kicker>
-        <h1 className="mt-2 font-black text-4xl tracking-tight sm:text-5xl">Mint an IL bond</h1>
-        <p className="mt-3 max-w-2xl text-bone/55">
+        <h1 className="mt-2 font-black text-balance text-3xl tracking-tight sm:text-5xl">Mint an IL bond</h1>
+        <p className="mt-3 max-w-2xl text-sm text-bone/55 sm:text-base">
           Add your two tokens to the pool, then name a premium. You get back two pieces: keep{' '}
           <Leg kind="fee" className="mx-0.5" /> for the steady earnings, and sell <Leg kind="il" className="mx-0.5" /> — the
           price risk — to someone who wants it.
@@ -146,7 +146,7 @@ export default function Create() {
 
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         {/* ── form ─────────────────────────────────────────── */}
-        <Card className="p-6 sm:p-8">
+        <Card className="p-5 sm:p-8">
           <div className="space-y-6">
             <Field
               label="How much to deposit"
