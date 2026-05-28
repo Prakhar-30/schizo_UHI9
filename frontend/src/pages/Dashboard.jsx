@@ -97,69 +97,76 @@ export default function Dashboard() {
         <Stat label="ALPHA / BETA" value={`${fmtToken(bal0, 18, 0)} / ${fmtToken(bal1, 18, 0)}`} accent="mint" sub="wallet balance" />
       </div>
 
-      {/* withdrawable */}
-      <Card className="mt-6 p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4 md:items-center">
-          <div className="min-w-0">
-            <Kicker>Claimable from the hook</Kicker>
-            <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-              <span className="font-mono text-xl font-bold tabular-nums text-yield sm:text-2xl">{fmtToken(amount0)} ALPHA</span>
-              <span className="text-bone/20">+</span>
-              <span className="font-mono text-xl font-bold tabular-nums text-risk sm:text-2xl">{fmtToken(amount1)} BETA</span>
+      {/* withdrawable + share side-by-side on lg+, stacked on smaller */}
+      <div
+        className={`mt-6 grid gap-6 ${
+          shareable.length > 0 && sharePosition ? 'lg:grid-cols-[1.35fr_1fr]' : ''
+        }`}
+      >
+        {/* withdrawable */}
+        <Card className="p-5 sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4 md:items-center">
+            <div className="min-w-0">
+              <Kicker>Claimable from the hook</Kicker>
+              <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                <span className="font-mono text-xl font-bold tabular-nums text-yield sm:text-2xl">{fmtToken(amount0)} ALPHA</span>
+                <span className="text-bone/20">+</span>
+                <span className="font-mono text-xl font-bold tabular-nums text-risk sm:text-2xl">{fmtToken(amount1)} BETA</span>
+              </div>
+            </div>
+            <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+              {nothing ? (
+                <Chip color="white">nothing to claim</Chip>
+              ) : hasBoth ? (
+                <>
+                  <Button variant="yield" size="md" className="flex-1 sm:flex-none" loading={pending} onClick={() => withdraw(ADDR.token0)}>
+                    Claim as ALPHA
+                  </Button>
+                  <Button variant="risk" size="md" className="flex-1 sm:flex-none" loading={pending} onClick={() => withdraw(ADDR.token1)}>
+                    Claim as BETA
+                  </Button>
+                </>
+              ) : (
+                <Button variant="bone" size="md" className="w-full sm:w-auto" loading={pending} onClick={() => withdraw(has1 ? ADDR.token1 : ADDR.token0)}>
+                  Withdraw
+                </Button>
+              )}
             </div>
           </div>
-          <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-            {nothing ? (
-              <Chip color="white">nothing to claim</Chip>
-            ) : hasBoth ? (
-              <>
-                <Button variant="yield" size="md" className="flex-1 sm:flex-none" loading={pending} onClick={() => withdraw(ADDR.token0)}>
-                  Claim as ALPHA
-                </Button>
-                <Button variant="risk" size="md" className="flex-1 sm:flex-none" loading={pending} onClick={() => withdraw(ADDR.token1)}>
-                  Claim as BETA
-                </Button>
-              </>
-            ) : (
-              <Button variant="bone" size="md" className="w-full sm:w-auto" loading={pending} onClick={() => withdraw(has1 ? ADDR.token1 : ADDR.token0)}>
-                Withdraw
-              </Button>
-            )}
-          </div>
-        </div>
-        {hasBoth && (
-          <p className="mt-4 rounded-lg border border-amber/30 bg-amber/5 p-3 font-mono text-[11px] text-amber/90">
-            note: the hook settles a withdrawal in a single token — claiming pays your full balance ({fmtToken((amount0 ?? 0n) + (amount1 ?? 0n))} units) in whichever token you choose.
-          </p>
-        )}
-      </Card>
-
-      {/* dedicated share section — sits above the bonds grid, right-aligned */}
-      {shareable.length > 0 && sharePosition && (
-        <Card className="ml-auto mt-6 w-full max-w-2xl p-5 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Kicker>Cast your bonds</Kicker>
-            <div className="flex flex-wrap items-center gap-2">
-              {shareable.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setShareId(p.id)}
-                  className={`rounded-md border-2 px-3 py-1 font-mono text-xs font-bold transition-colors ${
-                    p.id === shareId
-                      ? 'border-volt bg-volt/10 text-volt'
-                      : 'border-white/15 text-bone/60 hover:border-white/35 hover:text-bone'
-                  }`}
-                >
-                  #{p.id}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="mt-4">
-            <SharePanel positionId={sharePosition.id} position={sharePosition} embedded />
-          </div>
+          {hasBoth && (
+            <p className="mt-4 rounded-lg border border-amber/30 bg-amber/5 p-3 font-mono text-[11px] text-amber/90">
+              note: the hook settles a withdrawal in a single token — claiming pays your full balance ({fmtToken((amount0 ?? 0n) + (amount1 ?? 0n))} units) in whichever token you choose.
+            </p>
+          )}
         </Card>
-      )}
+
+        {/* share panel (paired right next to withdrawable on lg+) */}
+        {shareable.length > 0 && sharePosition && (
+          <Card className="p-5 sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <Kicker>Cast your bonds</Kicker>
+              <div className="flex flex-wrap items-center gap-2">
+                {shareable.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setShareId(p.id)}
+                    className={`rounded-md border-2 px-2.5 py-1 font-mono text-xs font-bold transition-colors ${
+                      p.id === shareId
+                        ? 'border-volt bg-volt/10 text-volt'
+                        : 'border-white/15 text-bone/60 hover:border-white/35 hover:text-bone'
+                    }`}
+                  >
+                    #{p.id}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mt-4">
+              <SharePanel positionId={sharePosition.id} position={sharePosition} embedded />
+            </div>
+          </Card>
+        )}
+      </div>
 
       {/* my positions */}
       <div className="mt-10">
