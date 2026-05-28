@@ -3,6 +3,7 @@ import { useAccount, usePublicClient } from 'wagmi'
 import { Link } from 'react-router-dom'
 import { maxUint256 } from 'viem'
 import { usePositions, useHookCounters, useReactiveStatus, useCurrentPrice } from '../hooks/reads'
+import OutcomeStrip from '../components/OutcomeStrip'
 import { sqrtPriceToPrice } from '../lib/il'
 import { fmtToken, fmtBpsPct, isSameAddr } from '../lib/format'
 import { ADDR, HOOK_ABI, ERC20_ABI, SEPOLIA_CHAIN_ID, sepoliaAddr } from '../config/contracts'
@@ -25,48 +26,74 @@ const SORTS = [
 
 const hookBase = { address: ADDR.hook, abi: HOOK_ABI }
 
-function HuntRow({ position, marked, busyId, onBuy }) {
-  const { id, lp, askPremium, ilMarkBps, liquidity } = position
+function HuntRow({ position, marked, busyId, currentSqrtPriceX96, onBuy }) {
+  const { id, lp, askPremium, ilMarkBps, liquidity, entrySqrtPriceX96 } = position
   const busy = busyId === id
+  const [open, setOpen] = useState(false)
 
   return (
-    <Card className="flex flex-col gap-4 p-4 transition-colors hover:border-volt/30 sm:p-5 md:flex-row md:items-center">
-      {/* id + lp */}
-      <div className="flex items-center gap-3 md:w-32">
-        <span className="font-black text-2xl">#{id}</span>
-        <Chip color="amber">
-          <span className="h-1.5 w-1.5 rounded-full bg-amber" /> IL-T open
-        </Chip>
+    <Card className="flex flex-col gap-4 p-4 transition-colors hover:border-volt/30 sm:p-5">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center">
+        {/* id + lp */}
+        <Link
+          to={`/positions/${id}`}
+          className="flex items-center gap-3 hover:text-volt md:w-32"
+        >
+          <span className="font-black text-2xl">#{id}</span>
+          <Chip color="amber">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber" /> IL-T open
+          </Chip>
+        </Link>
+
+        {/* IL gauge */}
+        <div className="md:w-56">
+          <ILGauge ilMarkBps={ilMarkBps} marked={marked} compact />
+        </div>
+
+        {/* numbers */}
+        <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="min-w-0">
+            <p className="kicker truncate">Premium</p>
+            <p className="mt-0.5 truncate font-mono text-base font-bold tabular-nums text-yield">
+              {fmtToken(askPremium)} BETA
+            </p>
+          </div>
+          <div className="min-w-0">
+            <p className="kicker truncate">Liquidity</p>
+            <p className="mt-0.5 truncate font-mono text-sm font-bold tabular-nums">{fmtToken(liquidity)}</p>
+          </div>
+          <div className="col-span-2 min-w-0 sm:col-span-1">
+            <p className="kicker">Listed by</p>
+            <Addr value={lp} href={sepoliaAddr(lp)} className="mt-0.5" />
+          </div>
+        </div>
+
+        {/* action */}
+        <div className="md:w-44">
+          <Button variant="risk" size="md" className="w-full" loading={busy} onClick={() => onBuy(position)}>
+            Buy IL-T
+          </Button>
+        </div>
       </div>
 
-      {/* IL gauge */}
-      <div className="md:w-56">
-        <ILGauge ilMarkBps={ilMarkBps} marked={marked} compact />
-      </div>
-
-      {/* numbers */}
-      <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3">
-        <div className="min-w-0">
-          <p className="kicker truncate">Premium</p>
-          <p className="mt-0.5 truncate font-mono text-base font-bold tabular-nums text-yield">
-            {fmtToken(askPremium)} BETA
-          </p>
-        </div>
-        <div className="min-w-0">
-          <p className="kicker truncate">Liquidity</p>
-          <p className="mt-0.5 truncate font-mono text-sm font-bold tabular-nums">{fmtToken(liquidity)}</p>
-        </div>
-        <div className="col-span-2 min-w-0 sm:col-span-1">
-          <p className="kicker">Listed by</p>
-          <Addr value={lp} href={sepoliaAddr(lp)} className="mt-0.5" />
-        </div>
-      </div>
-
-      {/* action */}
-      <div className="md:w-44">
-        <Button variant="risk" size="md" className="w-full" loading={busy} onClick={() => onBuy(position)}>
-          Buy IL-T
-        </Button>
+      {/* outcome math (collapsible) */}
+      <div>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-bone/40 hover:text-volt"
+        >
+          <span>{open ? '▾' : '▸'}</span>
+          {open ? 'hide outcome math' : 'show outcome math'}
+        </button>
+        {open && (
+          <div className="mt-3">
+            <OutcomeStrip
+              entrySqrtPriceX96={entrySqrtPriceX96}
+              currentSqrtPriceX96={currentSqrtPriceX96}
+              compact
+            />
+          </div>
+        )}
       </div>
     </Card>
   )
@@ -290,6 +317,7 @@ export default function Hunt() {
                 position={p}
                 marked={bundles > 0n}
                 busyId={pending ? busyId : null}
+                currentSqrtPriceX96={price?.sqrtPriceX96}
                 onBuy={handleBuy}
               />
             ))}

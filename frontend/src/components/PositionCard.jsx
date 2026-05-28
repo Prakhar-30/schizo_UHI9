@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAccount, usePublicClient } from 'wagmi'
 import { maxUint256, isAddress } from 'viem'
 import { ADDR, HOOK_ABI, ERC20_ABI, SEPOLIA_CHAIN_ID, sepoliaAddr } from '../config/contracts'
@@ -90,7 +91,7 @@ export default function PositionCard({ position, marked = true, onAction }) {
     <Card className="flex flex-col p-4 sm:p-5">
       {/* header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <Link to={`/positions/${id}`} className="flex items-center gap-2 hover:text-volt">
           <span className="font-black text-xl">#{id}</span>
           {active ? (
             <Chip color="mint">
@@ -99,7 +100,7 @@ export default function PositionCard({ position, marked = true, onAction }) {
           ) : (
             <Chip color="white">exited</Chip>
           )}
-        </div>
+        </Link>
         <Chip color={ilBondSold ? 'risk' : 'amber'}>{ilBondSold ? 'IL-T sold' : 'IL-T open'}</Chip>
       </div>
 
@@ -158,6 +159,13 @@ export default function PositionCard({ position, marked = true, onAction }) {
         {!isConnected && !canBuy && (
           <p className="text-center font-mono text-[11px] text-bone/30">connect to interact</p>
         )}
+
+        <Link
+          to={`/positions/${id}`}
+          className="mt-3 block text-center font-mono text-[11px] uppercase tracking-wider text-bone/35 hover:text-volt"
+        >
+          view details ↗
+        </Link>
       </div>
 
       <Modal

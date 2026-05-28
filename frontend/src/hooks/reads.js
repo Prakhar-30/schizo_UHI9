@@ -115,10 +115,11 @@ export function useCurrentPrice() {
   }
 }
 
-// ── activity feed (all hook events, decoded + timestamped) ──────────────────
-export function useActivity({ limit = 50 } = {}) {
+// ── all hook events in the lookback window (raw + timestamped) ─────────────
+// One fetch, shared by activity / per-position / leaderboard via react-query cache.
+export function useAllEvents() {
   return useQuery({
-    queryKey: ['activity', limit],
+    queryKey: ['allHookEvents'],
     refetchInterval: REFRESH,
     queryFn: async () => {
       const latest = await logClient.getBlockNumber()
@@ -126,30 +127,132 @@ export function useActivity({ limit = 50 } = {}) {
       const raw = await logClient.getLogs({ address: ADDR.hook, fromBlock: from, toBlock: 'latest' })
       const decoded = parseEventLogs({ abi: HOOK_ABI, logs: raw })
 
-      const ordered = decoded
-        .sort((a, b) =>
-          a.blockNumber === b.blockNumber
-            ? Number(a.logIndex - b.logIndex)
-            : Number(a.blockNumber - b.blockNumber),
-        )
-        .slice(-limit)
-        .reverse()
-
-      const uniqueBlocks = [...new Set(ordered.map((l) => l.blockNumber))]
+      const uniqueBlocks = [...new Set(decoded.map((l) => l.blockNumber))]
       const blocks = await Promise.all(uniqueBlocks.map((bn) => logClient.getBlock({ blockNumber: bn })))
       const tsMap = {}
       blocks.forEach((b) => (tsMap[b.number.toString()] = Number(b.timestamp)))
 
-      return ordered.map((l) => ({
+      return decoded.map((l) => ({
         key: `${l.transactionHash}-${l.logIndex}`,
         name: l.eventName,
         args: l.args,
         txHash: l.transactionHash,
         blockNumber: l.blockNumber,
+        logIndex: l.logIndex,
         ts: tsMap[l.blockNumber.toString()],
       }))
     },
   })
+}
+
+// ── activity feed (newest first, optionally filtered to a position) ─────────
+export function useActivity({ limit = 50, positionId } = {}) {
+  const r = useAllEvents()
+  const events = useMemo(() => {
+    if (!r.data) return []
+    let arr = r.data
+    if (positionId !== undefined && positionId !== null) {
+      const want = Number(positionId)
+      arr = arr.filter(
+        (e) => e.args?.positionId !== undefined && Number(e.args.positionId) === want,
+      )
+    }
+    return [...arr]
+      .sort((a, b) =>
+        a.blockNumber === b.blockNumber
+          ? Number(a.logIndex - b.logIndex)
+          : Number(a.blockNumber - b.blockNumber),
+      )
+      .slice(-limit)
+      .reverse()
+  }, [r.data, limit, positionId])
+  return { data: events, isLoading: r.isLoading, refetch: r.refetch }
+}
+
+// ── per-position history: IL marks + swaps + creation/sale events ───────────
+export function usePositionHistory(positionId) {
+  const r = useAllEvents()
+  return useMemo(() => {
+    const empty = { events: [], ilMarks: [], swaps: [], created: null, sold: null }
+    if (!r.data || positionId === undefined || positionId === null) {
+      return { ...empty, isLoading: r.isLoading }
+    }
+    const want = Number(positionId)
+    const events = r.data
+      .filter((e) => e.args?.positionId !== undefined && Number(e.args.positionId) === want)
+      .sort((a, b) => Number(a.blockNumber - b.blockNumber))
+    const ilMarks = events.filter((e) => e.name === 'ILMarkUpdated')
+    const swaps = r.data
+      .filter((e) => e.name === 'SwapOccurred')
+      .sort((a, b) => Number(a.blockNumber - b.blockNumber))
+    const created = events.find((e) => e.name === 'PositionCreated') || null
+    const sold = events.find((e) => e.name === 'ILBondSold') || null
+    return { events, ilMarks, swaps, created, sold, isLoading: r.isLoading }
+  }, [r.data, positionId, r.isLoading])
+}
+
+// ── leaderboard aggregations from event log + on-chain position state ──────
+export function useLeaderboardData() {
+  const r = useAllEvents()
+  const { positions } = usePositions()
+  return useMemo(() => {
+    const events = r.data || []
+    const sold = events.filter((e) => e.name === 'ILBondSold')
+    const created = events.filter((e) => e.name === 'PositionCreated')
+
+    // index positions by id for quick lookup
+    const byId = new Map(positions.map((p) => [Number(p.id), p]))
+
+    // 1. LP earnings — sum of premium received per original LP
+    const lpEarn = new Map()
+    for (const e of sold) {
+      const p = byId.get(Number(e.args.positionId))
+      if (!p) continue
+      const lp = (p.lp || '').toLowerCase()
+      lpEarn.set(lp, (lpEarn.get(lp) || 0n) + (e.args.premium || 0n))
+    }
+
+    // 2. Hunter spend — sum of premium paid per buyer
+    const hunterSpend = new Map()
+    for (const e of sold) {
+      const b = (e.args.buyer || '').toLowerCase()
+      hunterSpend.set(b, (hunterSpend.get(b) || 0n) + (e.args.premium || 0n))
+    }
+
+    // 3. LP activity — count of PositionCreated per owner
+    const lpCount = new Map()
+    for (const e of created) {
+      const o = (e.args.owner || '').toLowerCase()
+      lpCount.set(o, (lpCount.get(o) || 0) + 1)
+    }
+
+    // 4. Active IL-T held — count of active sold positions per ilHolder
+    const ilHeld = new Map()
+    for (const p of positions) {
+      if (!p.active || !p.ilBondSold) continue
+      const h = (p.ilHolder || '').toLowerCase()
+      ilHeld.set(h, (ilHeld.get(h) || 0) + 1)
+    }
+
+    const toList = (m) =>
+      [...m.entries()]
+        .map(([address, value]) => ({ address, value }))
+        .sort((a, b) => (a.value > b.value ? -1 : a.value < b.value ? 1 : 0))
+        .slice(0, 10)
+
+    return {
+      lpEarnings: toList(lpEarn),
+      hunterSpend: toList(hunterSpend),
+      lpCount: toList(lpCount),
+      ilHolders: toList(ilHeld),
+      totals: {
+        positionsMinted: created.length,
+        bondsSold: sold.length,
+        totalPremium: sold.reduce((s, e) => s + (e.args.premium || 0n), 0n),
+      },
+      isLoading: r.isLoading,
+    }
+  }, [r.data, positions, r.isLoading])
 }
 
 // ── per-account token balances + hook allowances ────────────────────────────

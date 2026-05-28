@@ -1,0 +1,363 @@
+import { useState } from 'react'
+import { useParams, Link } from 'react-router-dom'
+import { useAccount, usePublicClient } from 'wagmi'
+import { maxUint256, isAddress } from 'viem'
+import SharePanel from '../components/SharePanel'
+import {
+  usePositions,
+  useCurrentPrice,
+  usePositionHistory,
+  useHookCounters,
+} from '../hooks/reads'
+import { sqrtPriceToPrice } from '../lib/il'
+import { fmtToken, fmtNum, fmtBpsPct, isSameAddr } from '../lib/format'
+import { ADDR, HOOK_ABI, ERC20_ABI, SEPOLIA_CHAIN_ID, sepoliaAddr, sepoliaTx } from '../config/contracts'
+import { useTx } from '../hooks/useTx'
+import { useToast } from '../components/ui/Toast'
+import { Card } from '../components/ui/Card'
+import { Kicker, Chip, Dot, Leg, Addr, Spinner, Divider } from '../components/ui/Bits'
+import { Field, Input } from '../components/ui/Input'
+import Button from '../components/ui/Button'
+import Modal from '../components/ui/Modal'
+import Stat from '../components/ui/Stat'
+import ILGauge from '../components/ILGauge'
+import ActivityFeed from '../components/ActivityFeed'
+import PositionChart from '../components/PositionChart'
+import OutcomeStrip from '../components/OutcomeStrip'
+
+const hookBase = { address: ADDR.hook, abi: HOOK_ABI }
+
+export default function PositionDetail() {
+  const { id } = useParams()
+  const positionId = Number(id)
+  const { address, isConnected } = useAccount()
+  const publicClient = usePublicClient({ chainId: SEPOLIA_CHAIN_ID })
+  const { run, pending } = useTx()
+  const { toast } = useToast()
+
+  const { positions, isLoading, refetch } = usePositions()
+  const { data: priceData } = useCurrentPrice()
+  const { bundles } = useHookCounters()
+  const history = usePositionHistory(positionId)
+  const position = positions.find((p) => Number(p.id) === positionId)
+
+  const [transfer, setTransfer] = useState(null) // 'fee' | 'il' | null
+  const [to, setTo] = useState('')
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+        <div className="flex items-center gap-2 font-mono text-sm text-bone/40">
+          <Spinner /> loading position…
+        </div>
+      </div>
+    )
+  }
+
+  if (!position) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-20 text-center sm:px-6">
+        <Kicker>Not found</Kicker>
+        <h1 className="mt-3 font-black text-3xl tracking-tight">No position #{id}</h1>
+        <p className="mt-3 text-bone/55">
+          Either it hasn't been minted yet or its id is outside the range.
+        </p>
+        <div className="mt-6 flex justify-center gap-3">
+          <Button to="/markets" variant="bone" size="md">See all positions</Button>
+          <Button to="/hunt" variant="outline" size="md">Hunt mode</Button>
+        </div>
+      </div>
+    )
+  }
+
+  const {
+    lp,
+    feeHolder,
+    ilHolder,
+    active,
+    ilBondSold,
+    liquidity,
+    entrySqrtPriceX96,
+    ilMarkBps,
+    askPremium,
+    tickLower,
+    tickUpper,
+  } = position
+
+  const isLp = isSameAddr(address, lp)
+  const isFee = isSameAddr(address, feeHolder)
+  const isIl = isSameAddr(address, ilHolder)
+  const involved = isLp || isFee || isIl
+  const canBuy = active && !ilBondSold && askPremium > 0n && isConnected && !isIl
+  const canExit = active && involved
+
+  const entryPrice = sqrtPriceToPrice(entrySqrtPriceX96)
+  const currentPrice = priceData ? sqrtPriceToPrice(priceData.sqrtPriceX96) : 0
+  const priceMovePct = entryPrice && currentPrice ? ((currentPrice / entryPrice) - 1) * 100 : 0
+
+  async function handleBuy() {
+    const allowance = await publicClient.readContract({
+      address: ADDR.token1,
+      abi: ERC20_ABI,
+      functionName: 'allowance',
+      args: [address, ADDR.hook],
+    })
+    if (allowance < askPremium) {
+      const ok = await run(
+        { address: ADDR.token1, abi: ERC20_ABI, functionName: 'approve', args: [ADDR.hook, maxUint256] },
+        { pendingMsg: 'Approving BETA…', successMsg: 'BETA approved' },
+      )
+      if (!ok) return
+    }
+    await run(
+      { ...hookBase, functionName: 'buyILBond', args: [BigInt(positionId)] },
+      { pendingMsg: 'Buying IL-T…', successMsg: `IL-T of position #${positionId} acquired`, onSuccess: refetch },
+    )
+  }
+
+  async function handleExit() {
+    await run(
+      { ...hookBase, functionName: 'exitPosition', args: [BigInt(positionId)] },
+      { pendingMsg: 'Exiting position…', successMsg: `Position #${positionId} exited`, onSuccess: refetch },
+    )
+  }
+
+  async function handleTransfer() {
+    if (!isAddress(to)) {
+      toast({ variant: 'error', title: 'Invalid address' })
+      return
+    }
+    const fn = transfer === 'fee' ? 'transferFeeToken' : 'transferILToken'
+    const ok = await run(
+      { ...hookBase, functionName: fn, args: [BigInt(positionId), to] },
+      {
+        pendingMsg: 'Transferring…',
+        successMsg: `${transfer === 'fee' ? 'FEE-T' : 'IL-T'} transferred`,
+        onSuccess: refetch,
+      },
+    )
+    if (ok) {
+      setTransfer(null)
+      setTo('')
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+      {/* breadcrumb */}
+      <div className="mb-4 flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-bone/40">
+        <Link to="/markets" className="hover:text-volt">markets</Link>
+        <span>›</span>
+        <span>position #{positionId}</span>
+      </div>
+
+      {/* header */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <Kicker>Position</Kicker>
+          <h1 className="mt-2 font-black text-3xl tracking-tight sm:text-5xl">
+            #{positionId}{' '}
+            {active ? (
+              <Chip color="mint" className="align-middle text-xs">
+                <Dot color="mint" /> active
+              </Chip>
+            ) : (
+              <Chip color="white" className="align-middle text-xs">exited</Chip>
+            )}{' '}
+            <Chip color={ilBondSold ? 'risk' : 'amber'} className="align-middle text-xs">
+              {ilBondSold ? 'IL-T sold' : 'IL-T open'}
+            </Chip>
+          </h1>
+          <p className="mt-2 font-mono text-xs text-bone/40 sm:text-sm">
+            tick {tickLower} → {tickUpper} · entry {fmtNum(entryPrice, 4)}
+          </p>
+        </div>
+
+        {canBuy && (
+          <Button variant="risk" size="lg" loading={pending} onClick={handleBuy}>
+            Buy IL-T · {fmtToken(askPremium)} BETA
+          </Button>
+        )}
+      </div>
+
+      {/* stats */}
+      <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+        <Stat
+          label="IL mark"
+          value={ilMarkBps !== undefined ? fmtBpsPct(ilMarkBps) : '—'}
+          accent="risk"
+          sub={bundles > 0n ? 'last RSC update' : 'awaiting first mark'}
+        />
+        <Stat
+          label="Premium"
+          value={`${fmtToken(askPremium)} BETA`}
+          accent="yield"
+          sub={ilBondSold ? 'already paid' : 'ask price'}
+        />
+        <Stat
+          label="Liquidity"
+          value={fmtToken(liquidity)}
+          accent="bone"
+        />
+        <Stat
+          label="Price move"
+          value={`${priceMovePct >= 0 ? '+' : ''}${priceMovePct.toFixed(2)}%`}
+          accent={Math.abs(priceMovePct) > 5 ? 'risk' : 'mint'}
+          sub={`entry ${fmtNum(entryPrice, 4)} → now ${fmtNum(currentPrice, 4)}`}
+        />
+      </div>
+
+      {/* body */}
+      <div className="mt-8 grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+        <div className="space-y-6">
+          {/* gauge */}
+          <Card className="p-5 sm:p-6">
+            <Kicker>Live IL mark</Kicker>
+            <div className="mt-3">
+              <ILGauge ilMarkBps={ilMarkBps} marked={bundles > 0n} />
+            </div>
+          </Card>
+
+          {/* chart */}
+          <PositionChart
+            ilMarks={history.ilMarks}
+            swaps={history.swaps}
+            entryPrice={entryPrice}
+          />
+
+          {/* outcome calculator */}
+          <OutcomeStrip
+            entrySqrtPriceX96={entrySqrtPriceX96}
+            currentSqrtPriceX96={priceData?.sqrtPriceX96}
+          />
+
+          {/* activity */}
+          <Card className="p-5 sm:p-6">
+            <div className="flex items-center justify-between">
+              <Kicker>This position's history</Kicker>
+              <Chip color="volt">{history.events.length} events</Chip>
+            </div>
+            <div className="mt-3 max-h-[24rem] overflow-y-auto pr-1">
+              <ActivityFeed
+                events={[...history.events].reverse()}
+                isLoading={history.isLoading}
+                emptyLabel="No events for this position yet."
+              />
+            </div>
+          </Card>
+        </div>
+
+        {/* aside */}
+        <aside className="space-y-6">
+          {/* holders */}
+          <Card className="p-5 sm:p-6">
+            <Kicker>Holders</Kicker>
+            <div className="mt-3 space-y-3">
+              <Row label="LP" value={lp} mine={isLp} />
+              <Divider />
+              <Row leg="fee" value={feeHolder} mine={isFee} />
+              <Divider />
+              <Row leg="il" value={ilHolder} mine={isIl} />
+            </div>
+          </Card>
+
+          {/* actions */}
+          {(involved || canBuy) && (
+            <Card className="p-5 sm:p-6">
+              <Kicker>Your moves</Kicker>
+              <div className="mt-3 flex flex-col gap-2">
+                {canBuy && (
+                  <Button variant="risk" size="md" loading={pending} onClick={handleBuy}>
+                    Buy IL-T · {fmtToken(askPremium)} BETA
+                  </Button>
+                )}
+                {isFee && active && (
+                  <Button variant="ghost" size="md" onClick={() => setTransfer('fee')}>
+                    Transfer FEE-T
+                  </Button>
+                )}
+                {isIl && active && (
+                  <Button variant="ghost" size="md" onClick={() => setTransfer('il')}>
+                    Transfer IL-T
+                  </Button>
+                )}
+                {canExit && (
+                  <Button variant="outline" size="md" loading={pending} onClick={handleExit}>
+                    Exit position
+                  </Button>
+                )}
+              </div>
+            </Card>
+          )}
+
+          {/* share */}
+          <SharePanel positionId={positionId} position={position} />
+
+          {/* receipts */}
+          {history.created && (
+            <Card className="p-5 sm:p-6">
+              <Kicker>Receipts</Kicker>
+              <div className="mt-3 space-y-2 font-mono text-xs">
+                <a
+                  href={sepoliaTx(history.created.txHash)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-between gap-2 text-bone/60 hover:text-volt"
+                >
+                  <span>Minted</span>
+                  <span>{history.created.txHash.slice(0, 10)}…↗</span>
+                </a>
+                {history.sold && (
+                  <a
+                    href={sepoliaTx(history.sold.txHash)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between gap-2 text-bone/60 hover:text-volt"
+                  >
+                    <span>IL-T sold</span>
+                    <span>{history.sold.txHash.slice(0, 10)}…↗</span>
+                  </a>
+                )}
+              </div>
+            </Card>
+          )}
+        </aside>
+      </div>
+
+      <Modal
+        open={!!transfer}
+        onClose={() => setTransfer(null)}
+        title={`Transfer ${transfer === 'fee' ? 'FEE-T' : 'IL-T'} · #${positionId}`}
+      >
+        <Field label="Recipient address" hint="The new holder of this leg. This is irreversible.">
+          <Input placeholder="0x…" value={to} onChange={(e) => setTo(e.target.value)} />
+        </Field>
+        <div className="mt-5 flex gap-2">
+          <Button variant="ghost" className="flex-1" onClick={() => setTransfer(null)}>
+            Cancel
+          </Button>
+          <Button
+            variant={transfer === 'fee' ? 'yield' : 'risk'}
+            className="flex-1"
+            loading={pending}
+            onClick={handleTransfer}
+          >
+            Transfer
+          </Button>
+        </div>
+      </Modal>
+    </div>
+  )
+}
+
+function Row({ label, leg, value, mine }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      {leg ? <Leg kind={leg} /> : <span className="font-mono text-xs uppercase tracking-wider text-bone/50">{label}</span>}
+      <div className="flex items-center gap-2">
+        {mine && <span className="font-mono text-[10px] uppercase tracking-wider text-volt">you</span>}
+        <Addr value={value} href={sepoliaAddr(value)} />
+      </div>
+    </div>
+  )
+}

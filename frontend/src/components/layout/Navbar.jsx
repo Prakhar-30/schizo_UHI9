@@ -8,6 +8,7 @@ const LINKS = [
   { to: '/create', label: 'Create' },
   { to: '/hunt', label: 'Hunt' },
   { to: '/markets', label: 'Markets' },
+  { to: '/leaders', label: 'Leaders' },
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/about', label: 'About' },
 ]
@@ -37,7 +38,7 @@ export default function Navbar() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-3 sm:gap-3 sm:px-6">
           <Logo />
 
-          <nav className="hidden items-center gap-4 md:flex">
+          <nav className="hidden items-center gap-3 lg:flex">
             {LINKS.map((l) => (
               <Item key={l.to} {...l} />
             ))}
@@ -46,7 +47,7 @@ export default function Navbar() {
           <div className="flex items-center gap-2">
             <WalletButton />
             <button
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-md border-2 border-white/15 text-bone md:hidden"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-md border-2 border-white/15 text-bone lg:hidden"
               onClick={() => setOpen((v) => !v)}
               aria-label="menu"
               aria-expanded={open}
@@ -61,7 +62,7 @@ export default function Navbar() {
         </div>
 
         {open && (
-          <nav className="flex flex-col gap-1 border-t border-white/10 bg-ink/95 px-4 py-3 backdrop-blur-xl md:hidden">
+          <nav className="flex flex-col gap-1 border-t border-white/10 bg-ink/95 px-4 py-3 backdrop-blur-xl lg:hidden">
             {LINKS.map((l) => (
               <Item key={l.to} {...l} onClick={() => setOpen(false)} />
             ))}
