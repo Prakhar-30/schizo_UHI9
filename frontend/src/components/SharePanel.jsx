@@ -65,68 +65,46 @@ export default function SharePanel({ positionId, position, embedded = false }) {
         <Chip color="volt">og-image enabled</Chip>
       </div>
 
-      {/* preview */}
-      <a
-        href={ogUrl}
-        target="_blank"
-        rel="noreferrer"
-        className="mt-3 block overflow-hidden rounded-xl border border-white/10 bg-ink-soft/50"
-        title="Open the OG card image"
-      >
-        {imgOk ? (
-          <img
-            src={ogUrl}
-            alt={`Position #${positionId} share card`}
-            className="block aspect-[1200/630] w-full object-cover"
-            loading="lazy"
-            onError={() => setImgOk(false)}
-          />
-        ) : (
-          <div className="aspect-[1200/630] w-full p-6 grid place-items-center text-center">
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-wider text-bone/40">og preview</p>
-              <p className="mt-2 text-sm text-bone/55">
-                Run <span className="font-mono text-volt">vercel dev</span> or deploy to see the live card.
-              </p>
-            </div>
-          </div>
-        )}
-      </a>
-
-      {/* tweet preview */}
-      <div className="mt-4 rounded-lg border border-white/10 bg-ink-soft/60 p-3">
-        <div className="mb-1 flex items-center justify-between">
-          <Kicker>Tweet text</Kicker>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-bone/30">
-            edit on X before posting
-          </span>
-        </div>
-        <pre className="whitespace-pre-wrap break-words font-mono text-[12px] leading-relaxed text-bone/80">
-          {tweetText}
-        </pre>
-      </div>
-
-      {/* link */}
-      <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/10 bg-ink-soft/60 px-3 py-2">
-        <span className="truncate font-mono text-[11px] text-bone/55">{shareUrl}</span>
-        <button
-          onClick={handleCopy}
-          className="ml-auto shrink-0 rounded-md border border-white/15 bg-white/5 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-bone/80 hover:border-volt hover:text-volt"
+      <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-stretch">
+        {/* thumbnail preview (constrained, not banner-sized) */}
+        <a
+          href={ogUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="block w-full shrink-0 overflow-hidden rounded-lg border border-white/10 bg-ink-soft/50 sm:w-[240px]"
+          title="Open the OG card image"
         >
-          {copied ? 'copied' : 'copy'}
-        </button>
-      </div>
+          {imgOk ? (
+            <img
+              src={ogUrl}
+              alt={`Position #${positionId} share card`}
+              className="block aspect-[1200/630] w-full object-cover"
+              loading="lazy"
+              onError={() => setImgOk(false)}
+            />
+          ) : (
+            <div className="aspect-[1200/630] grid w-full place-items-center p-3 text-center">
+              <p className="font-mono text-[10px] text-bone/40">og preview — deploy to render</p>
+            </div>
+          )}
+        </a>
 
-      {/* buttons */}
-      <div className="mt-3">
-        <Button href={tweetHref} variant="bone" size="md" className="w-full">
-          Post on X →
-        </Button>
+        {/* actions column */}
+        <div className="flex flex-1 flex-col justify-between gap-3">
+          <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-ink-soft/60 px-3 py-2">
+            <span className="truncate font-mono text-[11px] text-bone/55">{shareUrl}</span>
+            <button
+              onClick={handleCopy}
+              className="ml-auto shrink-0 rounded-md border border-white/15 bg-white/5 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-bone/80 hover:border-volt hover:text-volt"
+            >
+              {copied ? 'copied' : 'copy'}
+            </button>
+          </div>
+          <Button href={tweetHref} variant="bone" size="md" className="w-full">
+            Post on X →
+          </Button>
+        </div>
       </div>
-
-      <p className="mt-3 font-mono text-[10px] text-bone/35">
-        // url has a built-in cache-buster (?v=id-mark) so X & Telegram always unfurl the latest card.
-      </p>
     </>
   )
 
