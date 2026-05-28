@@ -58,12 +58,12 @@ export default function About() {
           <Dot color="volt" pulse /> UHI9 · Theme: Impermanent Loss
         </Chip>
         <h1 className="mt-5 font-black text-4xl leading-[0.95] tracking-tight sm:text-6xl">
-          A bond market for impermanent loss.
+          LP yield, without impermanent loss.
         </h1>
         <p className="mt-6 text-lg leading-relaxed text-bone/60">
           Every IL hook before this one tried to <i>reduce</i> impermanent loss. schizō does something different — it{' '}
-          <b className="text-bone">separates</b> it. One LP position becomes two claims: a yield leg and a risk leg, with
-          a market-priced premium changing hands between them.
+          <b className="text-bone">sells it</b>. One LP position becomes two claims: a yield leg you keep, and a risk leg
+          a buyer takes off your hands for a premium.
         </p>
       </div>
 

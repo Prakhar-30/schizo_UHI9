@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useHookCounters, useReactiveStatus } from '../hooks/reads'
 import Button from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
-import { Kicker, Chip, Dot, Leg } from '../components/ui/Bits'
+import { Kicker, Chip, Dot } from '../components/ui/Bits'
 import Marquee from '../components/layout/Marquee'
 import SplitDiagram from '../components/SplitDiagram'
 
@@ -27,17 +27,16 @@ export default function Home() {
           <div>
             <div className="mb-6 inline-flex items-center gap-2">
               <Chip color="volt">
-                <Dot color="volt" pulse /> Powered by Reactive Network
+                <Dot color="volt" pulse /> Live on Sepolia
               </Chip>
-              <Chip color="white">Uniswap v4 hook</Chip>
             </div>
 
             <h1 className="font-black leading-[0.92] tracking-tight text-5xl sm:text-6xl lg:text-7xl">
-              Split the LP.
+              LP fees.
               <br />
-              Trade the{' '}
+              Without the{' '}
               <span className="relative inline-block">
-                <span className="text-risk">risk</span>
+                <span className="text-risk">loss</span>
                 <svg className="absolute -bottom-2 left-0 w-full" height="10" viewBox="0 0 200 10" preserveAspectRatio="none">
                   <path d="M2 6 Q 50 2 100 6 T 198 5" stroke="#ff2e6d" strokeWidth="3" fill="none" />
                 </svg>
@@ -45,20 +44,16 @@ export default function Home() {
               .
             </h1>
 
-            <p className="mt-7 max-w-xl text-lg leading-relaxed text-bone/60">
-              Providing liquidity bundles two things together: <span className="text-yield">the fees you earn</span> and{' '}
-              <span className="text-risk">the loss when prices move</span> (impermanent loss). <b className="text-bone">schizō</b>{' '}
-              splits them into two pieces you can trade on their own — <Leg kind="fee" className="mx-0.5" /> for the earnings,{' '}
-              <Leg kind="il" className="mx-0.5" /> for the risk — and the Reactive Network keeps a live price on that risk after
-              every trade.
+            <p className="mt-7 max-w-md text-lg leading-relaxed text-bone/65">
+              Pay someone else to take your impermanent loss. Keep the yield.
             </p>
 
             <div className="mt-9 flex flex-wrap gap-3">
               <Button to="/create" variant="bone" size="lg">
-                Create a bond →
+                Sell your risk →
               </Button>
-              <Button to="/markets" variant="outline" size="lg">
-                Explore markets
+              <Button to="/hunt" variant="risk" size="lg">
+                Hunt IL-T bonds
               </Button>
             </div>
           </div>
@@ -201,9 +196,12 @@ export default function Home() {
           <p className="relative mx-auto mt-4 max-w-lg text-bone/55">
             Mint your first bond on Sepolia in under a minute. Test tokens are one click away.
           </p>
-          <div className="relative mt-8 flex justify-center gap-3">
+          <div className="relative mt-8 flex flex-wrap justify-center gap-3">
             <Button to="/create" variant="bone" size="lg">
-              Launch the app →
+              I'm an LP →
+            </Button>
+            <Button to="/hunt" variant="risk" size="lg">
+              I'm a hunter →
             </Button>
             <Button to="/about" variant="ghost" size="lg">
               How it works

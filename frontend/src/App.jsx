@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import Layout from './components/layout/Layout'
 import Home from './pages/Home'
 import Create from './pages/Create'
+import Hunt from './pages/Hunt'
 import Markets from './pages/Markets'
 import Dashboard from './pages/Dashboard'
 import About from './pages/About'
@@ -13,6 +14,7 @@ export default function App() {
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="/create" element={<Create />} />
+        <Route path="/hunt" element={<Hunt />} />
         <Route path="/markets" element={<Markets />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/about" element={<About />} />

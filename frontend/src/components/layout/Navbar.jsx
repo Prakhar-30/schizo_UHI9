@@ -6,6 +6,7 @@ import WalletButton from './WalletButton'
 const LINKS = [
   { to: '/', label: 'Home', end: true },
   { to: '/create', label: 'Create' },
+  { to: '/hunt', label: 'Hunt' },
   { to: '/markets', label: 'Markets' },
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/about', label: 'About' },
