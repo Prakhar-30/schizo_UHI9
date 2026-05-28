@@ -13,6 +13,7 @@ import { Field, Input } from './ui/Input'
 import Button from './ui/Button'
 import Modal from './ui/Modal'
 import ILGauge from './ILGauge'
+import SharePanel from './SharePanel'
 
 const hookBase = { address: ADDR.hook, abi: HOOK_ABI }
 
@@ -36,6 +37,7 @@ export default function PositionCard({ position, marked = true, onAction }) {
   const { toast } = useToast()
   const [transfer, setTransfer] = useState(null) // 'fee' | 'il' | null
   const [to, setTo] = useState('')
+  const [shareOpen, setShareOpen] = useState(false)
 
   const isFee = isSameAddr(address, feeHolder)
   const isIl = isSameAddr(address, ilHolder)
@@ -160,13 +162,31 @@ export default function PositionCard({ position, marked = true, onAction }) {
           <p className="text-center font-mono text-[11px] text-bone/30">connect to interact</p>
         )}
 
-        <Link
-          to={`/positions/${id}`}
-          className="mt-3 block text-center font-mono text-[11px] uppercase tracking-wider text-bone/35 hover:text-volt"
-        >
-          view details ↗
-        </Link>
+        <div className="mt-3 flex items-center justify-center gap-4">
+          <Link
+            to={`/positions/${id}`}
+            className="font-mono text-[11px] uppercase tracking-wider text-bone/35 hover:text-volt"
+          >
+            view details ↗
+          </Link>
+          <span className="text-bone/15">·</span>
+          <button
+            onClick={() => setShareOpen(true)}
+            className="font-mono text-[11px] uppercase tracking-wider text-bone/35 hover:text-volt"
+          >
+            share ↗
+          </button>
+        </div>
       </div>
+
+      <Modal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        title={`Share position #${id}`}
+        maxW="max-w-lg"
+      >
+        <SharePanel positionId={id} position={position} embedded />
+      </Modal>
 
       <Modal
         open={!!transfer}
