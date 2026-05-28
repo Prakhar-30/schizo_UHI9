@@ -134,6 +134,33 @@ export default function Dashboard() {
         )}
       </Card>
 
+      {/* dedicated share section — sits above the bonds grid, right-aligned */}
+      {shareable.length > 0 && sharePosition && (
+        <Card className="ml-auto mt-6 w-full max-w-2xl p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Kicker>Cast your bonds</Kicker>
+            <div className="flex flex-wrap items-center gap-2">
+              {shareable.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setShareId(p.id)}
+                  className={`rounded-md border-2 px-3 py-1 font-mono text-xs font-bold transition-colors ${
+                    p.id === shareId
+                      ? 'border-volt bg-volt/10 text-volt'
+                      : 'border-white/15 text-bone/60 hover:border-white/35 hover:text-bone'
+                  }`}
+                >
+                  #{p.id}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-4">
+            <SharePanel positionId={sharePosition.id} position={sharePosition} embedded />
+          </div>
+        </Card>
+      )}
+
       {/* my positions */}
       <div className="mt-10">
         <SectionHead
@@ -171,32 +198,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* dedicated share section — sits below positions as a focused callout */}
-      {shareable.length > 0 && sharePosition && (
-        <Card className="mx-auto mt-10 max-w-2xl p-5 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Kicker>Cast your bonds</Kicker>
-            <div className="flex flex-wrap items-center gap-2">
-              {shareable.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setShareId(p.id)}
-                  className={`rounded-md border-2 px-3 py-1 font-mono text-xs font-bold transition-colors ${
-                    p.id === shareId
-                      ? 'border-volt bg-volt/10 text-volt'
-                      : 'border-white/15 text-bone/60 hover:border-white/35 hover:text-bone'
-                  }`}
-                >
-                  #{p.id}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="mt-4">
-            <SharePanel positionId={sharePosition.id} position={sharePosition} embedded />
-          </div>
-        </Card>
-      )}
     </div>
   )
 }
