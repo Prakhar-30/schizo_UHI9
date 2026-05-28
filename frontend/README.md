@@ -57,9 +57,12 @@ Telegram / Discord / iMessage unfurl them automatically.
 - **Image renderer** — `api/og.js` (Vercel Edge Function, `@vercel/og`, plain JS + `React.createElement`
   so Vercel's TS check doesn't run on it). Reads the position straight from Sepolia and renders a
   1200×630 PNG.
-- **Meta injection** — `middleware.js` rewrites the SPA HTML for `/positions/:id` so the og:image /
-  twitter:image tags are present *before* JS runs (social crawlers don't execute JS).
-- **Routing** — `vercel.json` rewrites everything except `/api/*` to `/index.html`.
+- **Meta injection** — `api/position-page.js` (Edge Function) fetches `/index.html`, injects `og:*`
+  and `twitter:*` tags for the requested position, and returns the rewritten HTML. Crawlers don't run
+  JS, so client-side meta updates wouldn't work — and Vercel's edge *middleware* is unreliable for
+  non-Next.js projects, so a rewrite + function is the bulletproof path.
+- **Routing** — `vercel.json` rewrites `/positions/:id(\d+)` → `/api/position-page?id=:id` and
+  everything else (except `/api/*`) → `/index.html`.
 
 To test locally with edge functions:
 
