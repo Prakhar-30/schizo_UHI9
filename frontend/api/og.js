@@ -47,9 +47,9 @@ const box = (style, ...kids) => h('div', { style: { display: 'flex', ...style } 
 
 function Stat(label, value, color) {
   return box(
-    { flexDirection: 'column', flex: 1, gap: 8 },
-    box({ fontSize: 18, color: C.mute, textTransform: 'uppercase', letterSpacing: '0.32em', fontWeight: 700 }, label),
-    box({ fontSize: 52, fontWeight: 800, color, letterSpacing: -1 }, value),
+    { flexDirection: 'column', flex: 1, gap: 6, minWidth: 0 },
+    box({ fontSize: 16, color: C.mute, textTransform: 'uppercase', letterSpacing: '0.32em', fontWeight: 700 }, label),
+    box({ fontSize: 44, fontWeight: 800, color, letterSpacing: -1 }, value),
   )
 }
 
@@ -151,24 +151,24 @@ export default async function handler(req) {
 
       // id + chip
       box(
-        { flexDirection: 'column', marginTop: 70 },
+        { flexDirection: 'column', marginTop: 32 },
         box(
-          { fontSize: 22, color: C.mute, textTransform: 'uppercase', letterSpacing: '0.32em', fontWeight: 700 },
+          { fontSize: 20, color: C.mute, textTransform: 'uppercase', letterSpacing: '0.32em', fontWeight: 700 },
           'IL Bond Position',
         ),
         box(
-          { alignItems: 'center', gap: 28, marginTop: 8 },
-          box({ fontSize: 200, fontWeight: 900, lineHeight: 0.95, letterSpacing: -6 }, '#' + id),
+          { alignItems: 'center', gap: 24, marginTop: 4 },
+          box({ fontSize: 150, fontWeight: 900, lineHeight: 0.95, letterSpacing: -5 }, '#' + id),
           box(
             {
-              padding: '14px 22px',
+              padding: '10px 18px',
               border: '2px solid ' + statusColor,
               color: statusColor,
-              borderRadius: 12,
-              fontSize: 26,
+              borderRadius: 10,
+              fontSize: 22,
               fontWeight: 700,
               letterSpacing: '0.18em',
-              marginBottom: 10,
+              marginBottom: 6,
             },
             statusLabel,
           ),
@@ -178,12 +178,12 @@ export default async function handler(req) {
       // stats grid
       box(
         {
-          gap: 24,
-          marginTop: 50,
+          gap: 20,
+          marginTop: 28,
           border: '2px solid ' + C.line,
-          borderRadius: 18,
+          borderRadius: 16,
           background: C.card,
-          padding: 28,
+          padding: 22,
         },
         Stat('Premium', pos ? fmtBeta(pos.askPremium) + ' BETA' : '—', C.yield),
         box({ width: 2, background: C.line }),
@@ -192,11 +192,14 @@ export default async function handler(req) {
         Stat('Liquidity', pos ? fmtBeta(pos.liquidity) : '—', C.bone),
       ),
 
+      // flex spacer (marginTop: auto can be unreliable in Satori)
+      box({ flex: 1 }),
+
       // footer
       box(
-        { alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' },
+        { alignItems: 'center', justifyContent: 'space-between' },
         box(
-          { fontSize: 22, color: C.mute, textTransform: 'uppercase', letterSpacing: '0.28em', fontWeight: 700 },
+          { fontSize: 20, color: C.mute, textTransform: 'uppercase', letterSpacing: '0.28em', fontWeight: 700 },
           'LP fees · without the impermanent loss',
         ),
         box(
