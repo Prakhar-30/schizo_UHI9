@@ -138,12 +138,8 @@ export default function Dashboard() {
       {shareable.length > 0 && sharePosition && (
         <Card className="mt-6 p-5 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <Kicker>Cast your bonds</Kicker>
-              <h3 className="mt-1 font-black text-xl tracking-tight">Share to X</h3>
-            </div>
+            <Kicker>Cast your bonds</Kicker>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-bone/40">position</span>
               {shareable.map((p) => (
                 <button
                   key={p.id}
@@ -159,7 +155,7 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-          <div className="mt-5">
+          <div className="mt-4">
             <SharePanel positionId={sharePosition.id} position={sharePosition} embedded />
           </div>
         </Card>

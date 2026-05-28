@@ -1,16 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { Card } from './ui/Card'
-import { Kicker, Chip } from './ui/Bits'
+import { Kicker } from './ui/Bits'
 import Button from './ui/Button'
 import { fmtToken, copy, isSameAddr } from '../lib/format'
 
 /**
- * Share panel for a position: copy-link, tweet intent, and an inline preview
- * of the OG card rendered by /api/og?id=N.
+ * Share panel for a position: copy-link, tweet intent, and a thumbnail of the
+ * OG card rendered by /api/og?id=N.
  *
- * Pass `embedded` when rendering inside a Modal so the outer Card wrapper
- * is skipped (Modal already provides the chrome).
+ * Pass `embedded` when rendering inside a Card you've already laid out (e.g.,
+ * the Dashboard's "Cast your bonds" section) so we don't double up on chrome.
  */
 export default function SharePanel({ positionId, position, embedded = false }) {
   const { address } = useAccount()
@@ -59,61 +59,60 @@ export default function SharePanel({ positionId, position, embedded = false }) {
   }
 
   const inner = (
-    <>
-      <div className="flex items-center justify-between">
-        <Kicker>Share</Kicker>
-        <Chip color="volt">og-image enabled</Chip>
-      </div>
-
-      <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-stretch">
-        {/* thumbnail preview (constrained, not banner-sized) */}
-        <a
-          href={ogUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="block w-full shrink-0 overflow-hidden rounded-lg border border-white/10 bg-ink-soft/50 sm:w-[240px]"
-          title="Open the OG card image"
-        >
-          {imgOk ? (
-            <img
-              src={ogUrl}
-              alt={`Position #${positionId} share card`}
-              className="block aspect-[1200/630] w-full object-cover"
-              loading="lazy"
-              onError={() => setImgOk(false)}
-            />
-          ) : (
-            <div className="aspect-[1200/630] grid w-full place-items-center p-3 text-center">
-              <p className="font-mono text-[10px] text-bone/40">og preview — deploy to render</p>
-            </div>
-          )}
-        </a>
-
-        {/* actions column */}
-        <div className="flex flex-1 flex-col justify-between gap-3">
-          <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-ink-soft/60 px-3 py-2">
-            <span className="truncate font-mono text-[11px] text-bone/55">{shareUrl}</span>
-            <button
-              onClick={handleCopy}
-              className="ml-auto shrink-0 rounded-md border border-white/15 bg-white/5 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-bone/80 hover:border-volt hover:text-volt"
-            >
-              {copied ? 'copied' : 'copy'}
-            </button>
+    <div className="space-y-4">
+      {/* compact card-style preview, centered, capped width */}
+      <a
+        href={ogUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="mx-auto block w-full max-w-sm overflow-hidden rounded-lg border border-white/10 bg-ink-soft/50 transition-opacity hover:opacity-90"
+        title="Open the OG card image"
+      >
+        {imgOk ? (
+          <img
+            src={ogUrl}
+            alt={`Position #${positionId} share card`}
+            className="block aspect-[1200/630] w-full"
+            loading="lazy"
+            onError={() => setImgOk(false)}
+          />
+        ) : (
+          <div className="grid aspect-[1200/630] w-full place-items-center p-3 text-center">
+            <p className="font-mono text-[10px] text-bone/40">og preview · deploy to render</p>
           </div>
-          <Button href={tweetHref} variant="bone" size="md" className="w-full">
-            Post on X →
-          </Button>
+        )}
+      </a>
+
+      {/* action row: url pill + primary CTA */}
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-white/10 bg-ink-soft/60 px-3 py-2">
+          <span className="truncate font-mono text-[11px] text-bone/55">{shareUrl}</span>
+          <button
+            onClick={handleCopy}
+            className="ml-auto shrink-0 rounded-md border border-white/15 bg-white/5 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-bone/80 hover:border-volt hover:text-volt"
+          >
+            {copied ? 'copied' : 'copy'}
+          </button>
         </div>
+        <Button href={tweetHref} variant="bone" size="md" className="shrink-0 sm:px-6">
+          Post on X →
+        </Button>
       </div>
-    </>
+    </div>
   )
 
-  if (embedded) return <div>{inner}</div>
-  return <Card className="p-5 sm:p-6">{inner}</Card>
+  if (embedded) return inner
+  return (
+    <Card className="p-5 sm:p-6">
+      <Kicker>Share</Kicker>
+      <div className="mt-3">{inner}</div>
+    </Card>
+  )
 }
 
 // ── tweet copy ────────────────────────────────────────────────────────────
-// Picks a punchy variant based on the user's relationship to the position.
+// Punchy variants chosen by user-role. Tight line spacing (no blank lines),
+// no em-dashes, subtle "↓" hook pointing at the unfurled card / URL.
 function composeTweet({ positionId, position, isLp, isFee, isIl }) {
   const ilBps = position?.ilMarkBps
   const hasMark = ilBps !== undefined && ilBps !== null && Number(ilBps) !== 0
@@ -124,52 +123,44 @@ function composeTweet({ positionId, position, isLp, isFee, isIl }) {
   const premium = position?.askPremium ? `${fmtToken(position.askPremium)} BETA` : '—'
   const sold = position?.ilBondSold
 
-  // Holding the FEE leg of a sold bond — the "I'm farming yield with no IL" flex.
+  // FEE-T holder of a sold bond — the "I farm yield, someone else eats IL" flex.
   if (sold && (isLp || isFee)) {
     return [
       `sold the impermanent loss on my LP for ${premium} 🫡`,
-      ``,
       ilAbs
-        ? `someone else is eating the -${ilAbs} now — i'm just collecting fees`
-        : `someone else holds the price risk now — i just collect fees`,
-      ``,
-      `position #${positionId} · schizō · marked live by @0xreactive every swap`,
+        ? `someone else holds the -${ilAbs} now. i just collect fees.`
+        : `someone else holds the price risk now. i just collect fees.`,
+      `position #${positionId} · schizō · @0xreactive marks live every swap`,
+      `yours? ↓`,
     ].join('\n')
   }
 
-  // Holding the IL leg — the degen risk-taker post.
+  // IL-T holder — the degen taking the bet.
   if (isIl) {
     return [
       `took the IL leg on position #${positionId} for ${premium} 📉`,
-      ``,
       `current mark: ${ilSigned} (live, posted by @0xreactive)`,
-      ``,
-      `if it recovers i print. if it doesn't 😅`,
+      `if it recovers i print. if not, 😅`,
       `schizō · UHI9 ↓`,
     ].join('\n')
   }
 
-  // Open bond, you're the LP advertising it.
+  // LP advertising an unsold bond.
   if (!sold && (isLp || isFee)) {
     return [
-      `my LP position is up for grabs 👀`,
-      ``,
-      `${premium} buys you the impermanent-loss leg.`,
+      `my LP is up for grabs 👀`,
+      `${premium} buys the impermanent-loss leg.`,
       `i keep the fees, you take the price risk.`,
-      ``,
-      `position #${positionId} · schizō · marked live by @0xreactive`,
+      `position #${positionId} · schizō · @0xreactive marks live ↓`,
     ].join('\n')
   }
 
-  // Default: promotional / "look at this cool thing"
+  // Default: "look at this thing" promotional.
   return [
     `impermanent loss is tradeable now 🤔`,
-    ``,
     `position #${positionId} on schizō`,
     `↳ ${premium} premium`,
-    `↳ IL mark: ${ilSigned} (live)`,
-    `↳ posted by @0xreactive every swap`,
-    ``,
+    `↳ IL mark: ${ilSigned} (live, by @0xreactive)`,
     `LP fees without the loss · UHI9 ↓`,
   ].join('\n')
 }
