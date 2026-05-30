@@ -13,6 +13,7 @@ import {
 } from '../config/contracts'
 import { POOL_ID } from '../config/poolKey'
 import { sepolia, LOG_RPC } from '../config/chains'
+import { fetchEventsFromSupabase, supabaseEnabled, nudgeIndexer } from '../lib/supabase'
 
 const hookBase = { address: ADDR.hook, abi: HOOK_ABI, chainId: SEPOLIA_CHAIN_ID }
 const REFRESH = 12000
@@ -115,32 +116,51 @@ export function useCurrentPrice() {
   }
 }
 
-// ── all hook events in the lookback window (raw + timestamped) ─────────────
+// ── on-chain fallback: events within the ~9500-block (~32h) public-RPC window ─
+// Used only when Supabase isn't configured/reachable. The full history lives in
+// Supabase (populated by api/index-events.js), which has no such cap.
+async function fetchEventsOnChain() {
+  const latest = await logClient.getBlockNumber()
+  const from = latest > LOG_LOOKBACK ? latest - LOG_LOOKBACK : 0n
+  const raw = await logClient.getLogs({ address: ADDR.hook, fromBlock: from, toBlock: 'latest' })
+  const decoded = parseEventLogs({ abi: HOOK_ABI, logs: raw })
+
+  const uniqueBlocks = [...new Set(decoded.map((l) => l.blockNumber))]
+  const blocks = await Promise.all(uniqueBlocks.map((bn) => logClient.getBlock({ blockNumber: bn })))
+  const tsMap = {}
+  blocks.forEach((b) => (tsMap[b.number.toString()] = Number(b.timestamp)))
+
+  return decoded.map((l) => ({
+    key: `${l.transactionHash}-${l.logIndex}`,
+    name: l.eventName,
+    args: l.args,
+    txHash: l.transactionHash,
+    blockNumber: l.blockNumber,
+    logIndex: l.logIndex,
+    ts: tsMap[l.blockNumber.toString()],
+  }))
+}
+
+// ── all hook events (full history) — Supabase-first, on-chain fallback ───────
 // One fetch, shared by activity / per-position / leaderboard via react-query cache.
+// Reads the complete event history from Supabase (no 32h cap); falls back to the
+// on-chain log window if Supabase is unconfigured or errors. Also nudges the
+// server-side indexer so newly-emitted events get picked up between cron runs.
 export function useAllEvents() {
   return useQuery({
     queryKey: ['allHookEvents'],
     refetchInterval: REFRESH,
     queryFn: async () => {
-      const latest = await logClient.getBlockNumber()
-      const from = latest > LOG_LOOKBACK ? latest - LOG_LOOKBACK : 0n
-      const raw = await logClient.getLogs({ address: ADDR.hook, fromBlock: from, toBlock: 'latest' })
-      const decoded = parseEventLogs({ abi: HOOK_ABI, logs: raw })
-
-      const uniqueBlocks = [...new Set(decoded.map((l) => l.blockNumber))]
-      const blocks = await Promise.all(uniqueBlocks.map((bn) => logClient.getBlock({ blockNumber: bn })))
-      const tsMap = {}
-      blocks.forEach((b) => (tsMap[b.number.toString()] = Number(b.timestamp)))
-
-      return decoded.map((l) => ({
-        key: `${l.transactionHash}-${l.logIndex}`,
-        name: l.eventName,
-        args: l.args,
-        txHash: l.transactionHash,
-        blockNumber: l.blockNumber,
-        logIndex: l.logIndex,
-        ts: tsMap[l.blockNumber.toString()],
-      }))
+      if (supabaseEnabled) {
+        try {
+          const events = await fetchEventsFromSupabase()
+          nudgeIndexer()
+          return events
+        } catch (err) {
+          console.warn('[schizo] Supabase event read failed, falling back to chain:', err)
+        }
+      }
+      return fetchEventsOnChain()
     },
   })
 }

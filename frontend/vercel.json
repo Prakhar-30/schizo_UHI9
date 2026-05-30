@@ -3,5 +3,8 @@
   "rewrites": [
     { "source": "/positions/:id(\\d+)", "destination": "/api/position-page?id=:id" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    { "path": "/api/index-events", "schedule": "0 0 * * *" }
   ]
 }

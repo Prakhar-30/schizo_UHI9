@@ -41,7 +41,7 @@ export default function PositionChart({ ilMarks, swaps, entryPrice }) {
       <div className="card p-6">
         <Kicker>History</Kicker>
         <p className="mt-3 font-mono text-sm text-bone/40">
-          No on-chain activity yet within the lookback window (~last 32h).
+          No on-chain activity recorded for this position yet.
         </p>
       </div>
     )
@@ -61,7 +61,7 @@ export default function PositionChart({ ilMarks, swaps, entryPrice }) {
       />
       <MiniChart
         title="Pool price"
-        sub={priceSeries.length ? `${priceSeries.length} swaps in window` : 'no swaps yet'}
+        sub={priceSeries.length ? `${priceSeries.length} swaps recorded` : 'no swaps yet'}
         data={priceSeries}
         getY={(d) => d.price}
         formatY={(v) => fmtNum(v, 4)}

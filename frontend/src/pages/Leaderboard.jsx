@@ -73,8 +73,8 @@ export default function Leaderboard() {
           <Kicker>Hall of the split</Kicker>
           <h1 className="mt-2 font-black text-balance text-3xl tracking-tight sm:text-5xl">Leaderboards</h1>
           <p className="mt-3 max-w-xl text-sm text-bone/55 sm:text-base">
-            Who's earned the most premium, who's holding the most risk, who's most active. Rolled up from on-chain
-            events in the last ~32 hours.
+            Who's earned the most premium, who's holding the most risk, who's most active. Rolled up from the full
+            on-chain event history.
           </p>
         </div>
         {data.isLoading && (
@@ -90,13 +90,13 @@ export default function Leaderboard() {
           label="Positions minted"
           value={data.totals.positionsMinted.toString()}
           accent="bone"
-          sub="in window"
+          sub="all-time"
         />
         <Stat
           label="Bonds sold"
           value={data.totals.bondsSold.toString()}
           accent="risk"
-          sub="IL-T transfers from sale"
+          sub="all-time"
         />
         <Stat
           label="Premium volume"
@@ -121,7 +121,7 @@ export default function Leaderboard() {
           rows={data.lpEarnings}
           formatValue={(v) => fmtToken(v)}
           valueLabel="BETA"
-          emptyLabel="No bond sales in window yet."
+          emptyLabel="No bond sales yet."
         />
         <Board
           title="Biggest hunters"
@@ -139,7 +139,7 @@ export default function Leaderboard() {
           rows={data.lpCount}
           formatValue={(v) => v.toString()}
           valueLabel="bonds"
-          emptyLabel="No mints in window."
+          emptyLabel="No mints yet."
         />
         <Board
           title="Heaviest IL holders"
@@ -154,7 +154,7 @@ export default function Leaderboard() {
 
       {/* footnote */}
       <p className="mt-10 font-mono text-[10px] uppercase tracking-wider text-bone/30">
-        // window limited by Sepolia free-tier log range (~9500 blocks ≈ 32h). active-IL counts use full chain state.
+        // aggregated from the full event history indexed off-chain. active-IL counts use live chain state.
       </p>
     </div>
   )
