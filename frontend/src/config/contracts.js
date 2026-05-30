@@ -46,11 +46,11 @@ export const SQRT_PRICE_1_1 = 79228162514264337593543950336n
 
 export const EXPLORER = {
   sepolia: 'https://sepolia.etherscan.io',
-  reactscan: 'https://lasna.reactscan.net',
+  reactscan: 'https://lasna.reactscan.net/address/0x49abe186a9b24f73e34ccae3d179299440c352ac/contract/',
 }
 export const sepoliaTx = (h) => `${EXPLORER.sepolia}/tx/${h}`
 export const sepoliaAddr = (a) => `${EXPLORER.sepolia}/address/${a}`
-export const reactscanAddr = (a) => `${EXPLORER.reactscan}/address/${a}`
+export const reactscanAddr = (a) => `${EXPLORER.reactscan}${a}`
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  ABIs  (human-readable → parsed)
