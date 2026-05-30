@@ -207,9 +207,18 @@ export default function PositionDetail() {
         />
       </div>
 
-      {/* body */}
-      <div className="mt-8 grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-        <div className="space-y-6">
+      {/* body — charts get the wide column on the right (and show first on mobile);
+          holders + your moves sit on the narrower left. */}
+      <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_1.7fr]">
+        {/* charts + history (right on desktop, first on mobile) */}
+        <div className="space-y-6 lg:order-2">
+          {/* price + IL charts */}
+          <PositionChart
+            ilMarks={history.ilMarks}
+            swaps={history.swaps}
+            entryPrice={entryPrice}
+          />
+
           {/* gauge */}
           <Card className="p-5 sm:p-6">
             <Kicker>Live IL mark</Kicker>
@@ -217,13 +226,6 @@ export default function PositionDetail() {
               <ILGauge ilMarkBps={ilMarkBps} marked={bundles > 0n} />
             </div>
           </Card>
-
-          {/* chart */}
-          <PositionChart
-            ilMarks={history.ilMarks}
-            swaps={history.swaps}
-            entryPrice={entryPrice}
-          />
 
           {/* outcome calculator */}
           <OutcomeStrip
@@ -247,8 +249,8 @@ export default function PositionDetail() {
           </Card>
         </div>
 
-        {/* aside */}
-        <aside className="space-y-6">
+        {/* aside — holders / your moves / share / receipts (left on desktop) */}
+        <aside className="space-y-6 lg:order-1">
           {/* holders */}
           <Card className="p-5 sm:p-6">
             <Kicker>Holders</Kicker>
