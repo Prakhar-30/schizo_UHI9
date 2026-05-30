@@ -111,7 +111,8 @@ export const REACTIVE_ABI = parseAbi([
   'function owner() view returns (address)',
 ])
 
-// Uniswap v4 StateView — read pool slot0 without touching event logs.
+// Uniswap v4 StateView — read pool slot0 + active liquidity without touching event logs.
 export const STATEVIEW_ABI = parseAbi([
   'function getSlot0(bytes32 poolId) view returns (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee)',
+  'function getLiquidity(bytes32 poolId) view returns (uint128 liquidity)',
 ])

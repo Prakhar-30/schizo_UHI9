@@ -98,19 +98,21 @@ export function usePositions() {
   return { positions, count, isLoading: r.isLoading || (count > 0 && !r.data), refetch }
 }
 
-// ── current pool price (read straight from v4 StateView, no logs) ───────────
+// ── current pool price + active liquidity (read from v4 StateView, no logs) ──
 export function useCurrentPrice() {
-  const r = useReadContract({
-    address: ADDR.stateView,
-    abi: STATEVIEW_ABI,
-    functionName: 'getSlot0',
-    args: [POOL_ID],
-    chainId: SEPOLIA_CHAIN_ID,
+  const r = useReadContracts({
+    contracts: [
+      { address: ADDR.stateView, abi: STATEVIEW_ABI, functionName: 'getSlot0', args: [POOL_ID], chainId: SEPOLIA_CHAIN_ID },
+      { address: ADDR.stateView, abi: STATEVIEW_ABI, functionName: 'getLiquidity', args: [POOL_ID], chainId: SEPOLIA_CHAIN_ID },
+    ],
     query: { refetchInterval: REFRESH },
   })
-  const d = r.data
+  const slot0 = r.data?.[0]?.result
+  const liquidity = r.data?.[1]?.result
   return {
-    data: d ? { sqrtPriceX96: d[0], tick: Number(d[1]), lpFee: d[3] } : undefined,
+    data: slot0
+      ? { sqrtPriceX96: slot0[0], tick: Number(slot0[1]), lpFee: Number(slot0[3]), liquidity }
+      : undefined,
     refetch: r.refetch,
     isLoading: r.isLoading,
   }
