@@ -29,7 +29,9 @@ function HolderRow({ kind, label, holder, mine }) {
 }
 
 export default function PositionCard({ position, marked = true, onAction }) {
-  const { id, lp, feeHolder, ilHolder, active, ilBondSold, liquidity, ilMarkBps, markValue, askPremium } = position
+  const { id, lp, feeHolder, ilHolder, active, ilBondSold, liquidity, ilMarkBps, liveIlBps, markValue, askPremium } = position
+  // Prefer the live (pool-price) mark; fall back to the last on-chain RSC mark.
+  const displayIlBps = liveIlBps !== undefined ? liveIlBps : ilMarkBps
   const { address, isConnected } = useAccount()
   const publicClient = usePublicClient({ chainId: SEPOLIA_CHAIN_ID })
   const { run, pending } = useTx()
@@ -106,7 +108,7 @@ export default function PositionCard({ position, marked = true, onAction }) {
 
       {/* il gauge */}
       <div className="mt-4">
-        <ILGauge ilMarkBps={ilMarkBps} marked={marked} />
+        <ILGauge ilMarkBps={displayIlBps} marked={marked} />
       </div>
 
       {/* numbers */}

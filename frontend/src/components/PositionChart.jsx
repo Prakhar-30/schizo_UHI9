@@ -55,7 +55,7 @@ export default function PositionChart({ ilMarks, swaps, entryPrice }) {
       <CandleChart data={priceSeries} entryPrice={entryPrice} />
       <MiniChart
         title="Impermanent loss"
-        sub={ilSeries.length ? `${ilSeries.length} marks posted by the RSC` : 'no marks yet'}
+        sub={ilSeries.length ? `${ilSeries.length} marks · one per RSC cycle` : 'no marks yet'}
         data={ilPlot}
         getY={(d) => d.bps}
         formatY={(v) => fmtBpsPct(v)}

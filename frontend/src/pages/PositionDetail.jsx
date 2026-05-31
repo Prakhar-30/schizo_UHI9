@@ -79,10 +79,14 @@ export default function PositionDetail() {
     liquidity,
     entrySqrtPriceX96,
     ilMarkBps,
+    liveIlBps,
     askPremium,
     tickLower,
     tickUpper,
   } = position
+
+  // IL marked to the live pool price (falls back to the last on-chain RSC mark).
+  const displayIlBps = liveIlBps !== undefined ? liveIlBps : ilMarkBps
 
   const isLp = isSameAddr(address, lp)
   const isFee = isSameAddr(address, feeHolder)
@@ -184,9 +188,9 @@ export default function PositionDetail() {
       <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
         <Stat
           label="IL mark"
-          value={ilMarkBps !== undefined ? fmtBpsPct(ilMarkBps) : '—'}
+          value={displayIlBps !== undefined ? fmtBpsPct(displayIlBps) : '—'}
           accent="risk"
-          sub={bundles > 0n ? 'last RSC update' : 'awaiting first mark'}
+          sub={bundles > 0n ? 'live · marked to pool price' : 'awaiting first mark'}
         />
         <Stat
           label="Premium"
@@ -223,7 +227,7 @@ export default function PositionDetail() {
           <Card className="p-5 sm:p-6">
             <Kicker>Live IL mark</Kicker>
             <div className="mt-3">
-              <ILGauge ilMarkBps={ilMarkBps} marked={bundles > 0n} />
+              <ILGauge ilMarkBps={displayIlBps} marked={displayIlBps !== undefined} />
             </div>
           </Card>
 

@@ -14,6 +14,7 @@ import {
 import { POOL_ID } from '../config/poolKey'
 import { sepolia, LOG_RPC } from '../config/chains'
 import { fetchEventsFromSupabase, supabaseEnabled, nudgeIndexer } from '../lib/supabase'
+import { computeIL, bundleMark } from '../lib/il'
 
 const hookBase = { address: ADDR.hook, abi: HOOK_ABI, chainId: SEPOLIA_CHAIN_ID }
 const REFRESH = 12000
@@ -47,6 +48,11 @@ export function useHookCounters() {
 export function usePositions() {
   const { nextId, refetch: refetchCounters } = useHookCounters()
   const count = nextId !== undefined ? Number(nextId) : 0
+  // Live pool price — lets us mark IL to market client-side instead of relying on
+  // the on-chain `ilMarkBps`, which only updates when the RSC's settleILMark leg
+  // lands (and can stall while swaps/bundles keep flowing).
+  const { data: priceData } = useCurrentPrice()
+  const currentSqrt = priceData?.sqrtPriceX96
 
   const contracts = useMemo(() => {
     const arr = []
@@ -71,6 +77,11 @@ export function usePositions() {
       if (!pos) continue
       const [lp, feeHolder, ilHolder, active, ilBondSold, liquidity, entrySqrtPriceX96, ilMarkBps, markValue, askPremium] = pos
       const [tickLower, tickUpper] = range || []
+      // Live IL mark from current price (falls back to the last on-chain mark).
+      const liveIlBps =
+        currentSqrt && entrySqrtPriceX96
+          ? BigInt(Math.round(computeIL(entrySqrtPriceX96, currentSqrt) * 10000))
+          : ilMarkBps
       out.push({
         id: i,
         lp,
@@ -81,6 +92,7 @@ export function usePositions() {
         liquidity,
         entrySqrtPriceX96,
         ilMarkBps,
+        liveIlBps,
         markValue,
         askPremium,
         tickLower,
@@ -88,7 +100,7 @@ export function usePositions() {
       })
     }
     return out
-  }, [r.data, count])
+  }, [r.data, count, currentSqrt])
 
   const refetch = () => {
     refetchCounters()
@@ -203,12 +215,38 @@ export function usePositionHistory(positionId) {
     const events = r.data
       .filter((e) => e.args?.positionId !== undefined && Number(e.args.positionId) === want)
       .sort((a, b) => Number(a.blockNumber - b.blockNumber))
-    const ilMarks = events.filter((e) => e.name === 'ILMarkUpdated')
     const swaps = r.data
       .filter((e) => e.name === 'SwapOccurred')
       .sort((a, b) => Number(a.blockNumber - b.blockNumber))
     const created = events.find((e) => e.name === 'PositionCreated') || null
     const sold = events.find((e) => e.name === 'ILBondSold') || null
+
+    // IL series — derive a mark from every ILBondDataBundle that includes this
+    // position. The bundle carries current price + per-position entry/liquidity,
+    // so we reproduce the RSC's mark for each cycle. This keeps the chart in sync
+    // even when the RSC's settleILMark → ILMarkUpdated leg lags or stalls.
+    const derived = r.data
+      .filter((e) => e.name === 'ILBondDataBundle')
+      .sort((a, b) => Number(a.blockNumber - b.blockNumber))
+      .map((e) => {
+        const mark = bundleMark(e.args?.data, want)
+        if (!mark) return null
+        return {
+          ts: e.ts,
+          blockNumber: e.blockNumber,
+          logIndex: e.logIndex,
+          name: 'ILMarkUpdated',
+          derived: true,
+          args: { positionId: BigInt(want), ilBps: BigInt(mark.ilBps), markValue: mark.markValue },
+        }
+      })
+      .filter(Boolean)
+
+    // Prefer the bundle-derived series (complete + fresh); fall back to the raw
+    // on-chain ILMarkUpdated events if no bundle decoded (e.g. pre-bundle history).
+    const onChainMarks = events.filter((e) => e.name === 'ILMarkUpdated')
+    const ilMarks = derived.length ? derived : onChainMarks
+
     return { events, ilMarks, swaps, created, sold, isLoading: r.isLoading }
   }, [r.data, positionId, r.isLoading])
 }
