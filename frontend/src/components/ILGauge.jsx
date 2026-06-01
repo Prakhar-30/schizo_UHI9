@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { fmtBpsPct } from '../lib/format'
 import { ilSeverity } from '../lib/il'
 
@@ -14,6 +15,20 @@ export default function ILGauge({ ilMarkBps, marked = true, compact = false }) {
   const pct = Math.max(2, sev * 100)
   const color = sevColor(sev)
 
+  // Flash when the RSC posts a fresh mark — makes "reactive on every swap" visible.
+  const prev = useRef(null)
+  const [flash, setFlash] = useState(false)
+  useEffect(() => {
+    const key = String(bps)
+    if (prev.current !== null && prev.current !== key) {
+      setFlash(true)
+      const t = setTimeout(() => setFlash(false), 1100)
+      prev.current = key
+      return () => clearTimeout(t)
+    }
+    prev.current = key
+  }, [bps])
+
   if (!marked) {
     return (
       <div className="font-mono text-xs text-bone/40">
@@ -25,12 +40,27 @@ export default function ILGauge({ ilMarkBps, marked = true, compact = false }) {
   return (
     <div className={compact ? '' : 'space-y-2'}>
       <div className="flex items-baseline justify-between">
-        <span className="kicker">Impermanent loss</span>
-        <span className={`font-mono font-bold tabular-nums ${color} ${compact ? 'text-base' : 'text-2xl'}`}>
+        <span className="kicker">
+          Impermanent loss
+          {flash && (
+            <span className="ml-2 inline-block animate-pulse rounded-sm bg-mint/15 px-1 font-mono text-[9px] uppercase tracking-wider text-mint">
+              new mark
+            </span>
+          )}
+        </span>
+        <span
+          className={`font-mono font-bold tabular-nums transition-colors duration-300 ${
+            flash ? 'text-mint' : color
+          } ${compact ? 'text-base' : 'text-2xl'}`}
+        >
           {bps === 0n ? '0.00%' : fmtBpsPct(bps)}
         </span>
       </div>
-      <div className="relative h-2.5 w-full overflow-hidden rounded-full border border-white/10 bg-ink-soft">
+      <div
+        className={`relative h-2.5 w-full overflow-hidden rounded-full border bg-ink-soft transition-shadow duration-300 ${
+          flash ? 'border-mint/60 animate-pulseRing' : 'border-white/10'
+        }`}
+      >
         <div
           className="h-full rounded-full transition-all duration-700"
           style={{

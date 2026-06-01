@@ -90,6 +90,8 @@ function HuntRow({ position, marked, busyId, currentSqrtPriceX96, onBuy }) {
             <OutcomeStrip
               entrySqrtPriceX96={entrySqrtPriceX96}
               currentSqrtPriceX96={currentSqrtPriceX96}
+              askPremium={askPremium}
+              liquidity={liquidity}
               compact
             />
           </div>

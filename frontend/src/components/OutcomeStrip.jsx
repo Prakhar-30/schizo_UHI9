@@ -21,7 +21,54 @@ function ilFromRatio(r) {
   return 1 - (2 * Math.sqrt(r)) / (1 + r) // positive number = loss to IL-T
 }
 
-export default function OutcomeStrip({ entrySqrtPriceX96, currentSqrtPriceX96, compact = false }) {
+function fmtPrice(p) {
+  if (!p || !isFinite(p)) return '–'
+  if (p >= 1000) return p.toLocaleString(undefined, { maximumFractionDigits: 0 })
+  if (p >= 1) return p.toPrecision(5).replace(/\.?0+$/, '')
+  return p.toPrecision(3)
+}
+
+/**
+ * The price band (entry-anchored) within which accrued IL stays *smaller* than
+ * the premium the hunter paid — i.e. the buffer the premium buys. Because the
+ * IL curve is symmetric (IL(r) = IL(1/r)), the band is symmetric in ratio
+ * around the entry price. Solving 1 − 2√r/(1+r) = ilBE for r:
+ *   x = √r,  x = (1 ± √(1−k²)) / k   with  k = 1 − ilBE
+ */
+function breakEvenBand(entry, current, askPremium, liquidity) {
+  if (!entry || !current || !askPremium || !liquidity) return null
+  const prem = Number(askPremium)
+  const liq = Number(liquidity)
+  if (!(liq > 0) || !(prem > 0)) return null
+  const ilBE = prem / liq // IL fraction that exactly eats the premium
+  if (ilBE >= 1) return null // premium >= principal: effectively unbreakable
+  const k = 1 - ilBE
+  const disc = 1 - k * k
+  if (disc < 0) return null
+  const sq = Math.sqrt(disc)
+  const rUp = ((1 + sq) / k) ** 2
+  const rDown = ((1 - sq) / k) ** 2
+  const priceUp = entry * rUp
+  const priceDown = entry * rDown
+  const inside = current >= priceDown && current <= priceUp
+  return {
+    ilBEPct: ilBE * 100,
+    priceDown,
+    priceUp,
+    // headroom from *here* before the premium is exhausted, each direction
+    moveUpPct: (priceUp / current - 1) * 100,
+    moveDownPct: (priceDown / current - 1) * 100,
+    inside,
+  }
+}
+
+export default function OutcomeStrip({
+  entrySqrtPriceX96,
+  currentSqrtPriceX96,
+  askPremium,
+  liquidity,
+  compact = false,
+}) {
   const rows = useMemo(() => {
     const entry = sqrtPriceToPrice(entrySqrtPriceX96)
     const current = sqrtPriceToPrice(currentSqrtPriceX96)
@@ -37,6 +84,17 @@ export default function OutcomeStrip({ entrySqrtPriceX96, currentSqrtPriceX96, c
       }
     })
   }, [entrySqrtPriceX96, currentSqrtPriceX96])
+
+  const band = useMemo(
+    () =>
+      breakEvenBand(
+        sqrtPriceToPrice(entrySqrtPriceX96),
+        sqrtPriceToPrice(currentSqrtPriceX96),
+        askPremium,
+        liquidity,
+      ),
+    [entrySqrtPriceX96, currentSqrtPriceX96, askPremium, liquidity],
+  )
 
   if (!rows) {
     return (
@@ -86,6 +144,37 @@ export default function OutcomeStrip({ entrySqrtPriceX96, currentSqrtPriceX96, c
           )
         })}
       </div>
+      {band && (
+        <div
+          className={`mt-3 rounded-md border px-3 py-2.5 ${
+            band.inside
+              ? 'border-yield/30 bg-yield/[0.06]'
+              : 'border-risk/30 bg-risk/[0.06]'
+          }`}
+        >
+          <div className="flex items-baseline justify-between">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-bone/45">
+              Premium break-even band
+            </span>
+            <span
+              className={`font-mono text-[10px] font-bold uppercase tracking-wider ${
+                band.inside ? 'text-yield' : 'text-risk'
+              }`}
+            >
+              {band.inside ? 'price inside · covered' : 'price outside · premium spent'}
+            </span>
+          </div>
+          <div className="mt-1.5 font-mono text-[12px] font-bold tabular-nums text-bone/80">
+            {fmtPrice(band.priceDown)} <span className="text-bone/30">↔</span> {fmtPrice(band.priceUp)}
+          </div>
+          {!compact && (
+            <div className="mt-1 font-mono text-[10px] tabular-nums text-bone/40">
+              {band.moveDownPct.toFixed(1)}% / +{band.moveUpPct.toFixed(1)}% from here · IL absorbed up to{' '}
+              {band.ilBEPct.toFixed(band.ilBEPct < 1 ? 2 : 1)}%
+            </div>
+          )}
+        </div>
+      )}
       {!compact && (
         <p className="mt-3 font-mono text-[10px] text-bone/35">
           IL is the loss vs holding the two tokens unchanged — your premium is your edge against it.

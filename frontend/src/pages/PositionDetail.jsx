@@ -235,6 +235,8 @@ export default function PositionDetail() {
           <OutcomeStrip
             entrySqrtPriceX96={entrySqrtPriceX96}
             currentSqrtPriceX96={priceData?.sqrtPriceX96}
+            askPremium={askPremium}
+            liquidity={liquidity}
           />
 
           {/* activity */}
