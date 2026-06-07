@@ -23,7 +23,7 @@ export default function Home() {
   return (
     <div>
       {/* ── HERO ─────────────────────────────────────────────── */}
-      <section className="relative mx-auto max-w-7xl px-4 pb-8 pt-10 sm:px-6 sm:pb-10 sm:pt-24">
+      <section className="relative mx-auto max-w-7xl px-4 pb-8 pt-8 sm:px-6 sm:pb-10 sm:pt-[4.8rem]">
         <div className="grid items-center gap-8 sm:gap-12 lg:grid-cols-[1.1fr_0.9fr]">
           <div>
             <div className="mb-6 inline-flex items-center gap-2">
