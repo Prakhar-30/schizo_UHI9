@@ -25,9 +25,10 @@ export default function SharePanel({ positionId, position, embedded = false }) {
   // Using the current IL mark as a version param makes the URL change whenever
   // the position state changes — forcing crawlers to re-fetch the fresh card.
   const cacheBuster = useMemo(() => {
-    const mark = position?.ilMarkBps !== undefined ? Math.abs(Number(position.ilMarkBps)) : 0
+    const live = position?.liveIlBps ?? position?.ilMarkBps
+    const mark = live !== undefined && live !== null ? Math.abs(Number(live)) : 0
     return `${positionId}-${mark}`
-  }, [positionId, position?.ilMarkBps])
+  }, [positionId, position?.liveIlBps, position?.ilMarkBps])
 
   const shareUrl = useMemo(() => {
     if (typeof window === 'undefined') return ''
@@ -114,23 +115,28 @@ export default function SharePanel({ positionId, position, embedded = false }) {
 // Punchy variants chosen by user-role. Tight line spacing (no blank lines),
 // no em-dashes, subtle "↓" hook pointing at the unfurled card / URL.
 function composeTweet({ positionId, position, isLp, isFee, isIl }) {
-  const ilBps = position?.ilMarkBps
+  // Prefer the live (pool-price) IL; fall back to the last on-chain RSC mark.
+  const ilBps = position?.liveIlBps ?? position?.ilMarkBps
   const hasMark = ilBps !== undefined && ilBps !== null && Number(ilBps) !== 0
   const ilSigned = hasMark
     ? `${Number(ilBps) > 0 ? '+' : ''}${(Number(ilBps) / 100).toFixed(2)}%`
     : 'pending'
   const ilAbs = hasMark ? `${Math.abs(Number(ilBps) / 100).toFixed(2)}%` : null
-  const premium = position?.askPremium ? `${fmtToken(position.askPremium)} BETA` : '—'
+  // Premium is denominated in the position's own pool token, with its decimals.
+  const premSym = position?.premiumSym || 'tokens'
+  const premDec = position?.premiumDec ?? 18
+  const premium = position?.askPremium ? `${fmtToken(position.askPremium, premDec)} ${premSym}` : '—'
+  const pair = position?.pool?.label ? ` (${position.pool.label})` : ''
   const sold = position?.ilBondSold
 
   // FEE-T holder of a sold bond — the "I farm yield, someone else eats IL" flex.
   if (sold && (isLp || isFee)) {
     return [
-      `sold the impermanent loss on my LP for ${premium} 🫡`,
+      `sold the impermanent loss on my ${position?.pool?.label || 'LP'} position for ${premium} 🫡`,
       ilAbs
         ? `someone else holds the -${ilAbs} now. i just collect fees.`
         : `someone else holds the price risk now. i just collect fees.`,
-      `position #${positionId} · schizō · @0xreactive marks live every swap`,
+      `position #${positionId}${pair} · schizō · @0xreactive marks live every swap`,
       `yours? ↓`,
     ].join('\n')
   }
@@ -138,7 +144,7 @@ function composeTweet({ positionId, position, isLp, isFee, isIl }) {
   // IL-T holder — the degen taking the bet.
   if (isIl) {
     return [
-      `took the IL leg on position #${positionId} for ${premium} 📉`,
+      `took the IL leg on position #${positionId}${pair} for ${premium} 📉`,
       `current mark: ${ilSigned} (live, posted by @0xreactive)`,
       `if it recovers i print. if not, 😅`,
       `schizō · UHI9 ↓`,
@@ -148,17 +154,17 @@ function composeTweet({ positionId, position, isLp, isFee, isIl }) {
   // LP advertising an unsold bond.
   if (!sold && (isLp || isFee)) {
     return [
-      `my LP is up for grabs 👀`,
+      `my ${position?.pool?.label || 'LP'} position is up for grabs 👀`,
       `${premium} buys the impermanent-loss leg.`,
       `i keep the fees, you take the price risk.`,
-      `position #${positionId} · schizō · @0xreactive marks live ↓`,
+      `position #${positionId}${pair} · schizō · @0xreactive marks live ↓`,
     ].join('\n')
   }
 
   // Default: "look at this thing" promotional.
   return [
     `impermanent loss is tradeable now 🤔`,
-    `position #${positionId} on schizō`,
+    `position #${positionId}${pair} on schizō`,
     `↳ ${premium} premium`,
     `↳ IL mark: ${ilSigned} (live, by @0xreactive)`,
     `LP fees without the loss · UHI9 ↓`,
