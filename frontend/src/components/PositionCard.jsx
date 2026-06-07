@@ -30,6 +30,9 @@ function HolderRow({ kind, label, holder, mine }) {
 
 export default function PositionCard({ position, marked = true, onAction }) {
   const { id, lp, feeHolder, ilHolder, active, ilBondSold, liquidity, ilMarkBps, liveIlBps, markValue, askPremium } = position
+  const premSym = position.premiumSym || 'token1'
+  const premDec = position.premiumDec ?? 18
+  const premiumToken = position.premiumToken || ADDR.token1
   // Prefer the live (pool-price) mark; fall back to the last on-chain RSC mark.
   const displayIlBps = liveIlBps !== undefined ? liveIlBps : ilMarkBps
   const { address, isConnected } = useAccount()
@@ -48,15 +51,15 @@ export default function PositionCard({ position, marked = true, onAction }) {
 
   async function handleBuy() {
     const allowance = await publicClient.readContract({
-      address: ADDR.token1,
+      address: premiumToken,
       abi: ERC20_ABI,
       functionName: 'allowance',
       args: [address, ADDR.hook],
     })
     if (allowance < askPremium) {
       const ok = await run(
-        { address: ADDR.token1, abi: ERC20_ABI, functionName: 'approve', args: [ADDR.hook, maxUint256] },
-        { pendingMsg: 'Approving BETA…', successMsg: 'BETA approved' },
+        { address: premiumToken, abi: ERC20_ABI, functionName: 'approve', args: [ADDR.hook, maxUint256] },
+        { pendingMsg: `Approving ${premSym}…`, successMsg: `${premSym} approved` },
       )
       if (!ok) return
     }
@@ -114,12 +117,12 @@ export default function PositionCard({ position, marked = true, onAction }) {
       {/* numbers */}
       <div className="mt-4 grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
-          <p className="kicker">Liquidity</p>
+          <p className="kicker">{position.pool?.label || 'Liquidity'}</p>
           <p className="mt-1 font-mono text-sm font-bold tabular-nums">{fmtToken(liquidity)}</p>
         </div>
         <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
           <p className="kicker">Premium</p>
-          <p className="mt-1 font-mono text-sm font-bold tabular-nums text-yield">{fmtToken(askPremium)} BETA</p>
+          <p className="mt-1 font-mono text-sm font-bold tabular-nums text-yield">{fmtToken(askPremium, premDec)} {premSym}</p>
         </div>
       </div>
 
@@ -134,7 +137,7 @@ export default function PositionCard({ position, marked = true, onAction }) {
       <div className="mt-auto pt-5">
         {canBuy && (
           <Button variant="risk" size="md" className="w-full" loading={pending} onClick={handleBuy}>
-            Buy IL-T · {fmtToken(askPremium)} BETA
+            Buy IL-T · {fmtToken(askPremium, premDec)} {premSym}
           </Button>
         )}
 

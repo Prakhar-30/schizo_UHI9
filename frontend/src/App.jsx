@@ -4,6 +4,7 @@ import Home from './pages/Home'
 import Create from './pages/Create'
 import Hunt from './pages/Hunt'
 import Markets from './pages/Markets'
+import Pools from './pages/Pools'
 import Dashboard from './pages/Dashboard'
 import About from './pages/About'
 import Leaderboard from './pages/Leaderboard'
@@ -17,6 +18,7 @@ export default function App() {
         <Route index element={<Home />} />
         <Route path="/create" element={<Create />} />
         <Route path="/hunt" element={<Hunt />} />
+        <Route path="/pools" element={<Pools />} />
         <Route path="/markets" element={<Markets />} />
         <Route path="/leaders" element={<Leaderboard />} />
         <Route path="/dashboard" element={<Dashboard />} />

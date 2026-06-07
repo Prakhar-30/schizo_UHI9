@@ -8,10 +8,12 @@ export const SEPOLIA_CHAIN_ID = 11155111
 export const LASNA_CHAIN_ID = 5318007
 
 export const ADDR = {
-  // Sepolia
-  hook: '0x55f571E0DC76De9154DeA40B4749a6449CF510C0',
-  token0: '0x1E0a671C889e49fA2Ecf2F07E3930cd9B11E3591', // ALPHA
-  token1: '0x9a731FC6652C8cc101ABcB0717d808ab09397aB9', // BETA
+  // Sepolia — v2 multi-pool deployment (2026-06-07)
+  hook: '0x9D19eA2aad6c8748d566f28fe375fb8BCAA350c0',
+  // Legacy single-pool aliases → now point at the DEMO pool (WBTC/WETH).
+  // currency0 = WETH (0x748b…), currency1 = WBTC (0x912a…) by address sort.
+  token0: '0x748b5C9623528D346C414F4f236B3b5b5c7683cb', // WETH (demo currency0)
+  token1: '0x912A7Fb66391eAe95DDee40B664FF497108580CD', // WBTC (demo currency1)
   poolManager: '0xE03A1074c86CFeDd5C142C4F04F1a1536e203543',
   stateView: '0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c',
   swapRouter: '0xf13D190e9117920c703d79B5F33732e10049b115',
@@ -19,12 +21,13 @@ export const ADDR = {
   permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
   callbackProxy: '0xc9f36411C9897e7F959D99ffca2a0Ba7ee0D7bDA',
   // Lasna
-  reactive: '0xe560786b23fd0408E8f42a6799630294F87203d9',
+  reactive: '0x7Aaa7EfE149a16Fdf5578b1E5B85E4F38D213655',
 }
 
+// Legacy demo-pair shorthand (WETH/WBTC). Prefer the full registry in config/pools.js.
 export const TOKENS = {
-  token0: { address: ADDR.token0, symbol: 'ALPHA', name: 'IL Bond ALPHA', decimals: 18 },
-  token1: { address: ADDR.token1, symbol: 'BETA', name: 'IL Bond BETA', decimals: 18 },
+  token0: { address: ADDR.token0, symbol: 'WETH', name: 'Wrapped Ether', decimals: 18 },
+  token1: { address: ADDR.token1, symbol: 'WBTC', name: 'Wrapped BTC', decimals: 8 },
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,10 +72,15 @@ export const HOOK_ABI = parseAbi([
   'function getPosition(uint256 positionId) view returns (address lp, address feeHolder, address ilHolder, bool active, bool ilBondSold, uint128 liquidity, uint160 entrySqrtPriceX96, int256 ilMarkBps, uint256 markValue, uint256 askPremium)',
   'function getRange(uint256 positionId) view returns (int24 tickLower, int24 tickUpper)',
   'function activePositionCount() view returns (uint256)',
-  'function getWithdrawable(address user) view returns (uint256 amount0, uint256 amount1)',
+  'function getClaimable(address user, address token) view returns (uint256)',
+  'function claimable(address user, address token) view returns (uint256)',
   'function nextPositionId() view returns (uint256)',
   'function bundleCounter() view returns (uint256)',
   'function BASE_FEE() view returns (uint24)',
+  'function MAX_FEE() view returns (uint24)',
+  'function currentFee(bytes32 poolId) view returns (uint24)',
+  'function poolInitialized(bytes32 poolId) view returns (bool)',
+  'function poolFeeState(bytes32 poolId) view returns (int24 lastTick, uint256 volEwma, bool initialized)',
   // events
   'event SwapOccurred(bytes32 indexed poolId, uint160 sqrtPriceX96, int24 tick, uint128 liquidity)',
   'event PositionCreated(uint256 indexed positionId, address indexed owner, uint160 entrySqrtPriceX96)',
@@ -83,6 +91,8 @@ export const HOOK_ABI = parseAbi([
   'event ILTokenTransferred(uint256 indexed positionId, address indexed from, address indexed to)',
   'event ILBondDataBundle(uint256 indexed bundleId, bytes data)',
   'event CycleCompleted(uint256 timestamp, uint256 positionsChecked)',
+  'event PoolRegistered(bytes32 indexed poolId, address currency0, address currency1, int24 tickSpacing, uint160 sqrtPriceX96)',
+  'event DynamicFeeUpdated(bytes32 indexed poolId, uint24 newFeePips, uint256 volEwma)',
 ])
 
 export const ERC20_ABI = parseAbi([

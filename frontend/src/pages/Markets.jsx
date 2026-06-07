@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
-import { usePositions, useHookCounters, useCurrentPrice, useReactiveStatus, useActivity } from '../hooks/reads'
-import { sqrtPriceToPrice } from '../lib/il'
-import { fmtNum, fmtBpsPct } from '../lib/format'
+import { usePositions, useHookCounters, useReactiveStatus, useActivity } from '../hooks/reads'
+import { POOLS } from '../config/pools'
+import { fmtBpsPct } from '../lib/format'
 import { ADDR, reactscanAddr } from '../config/contracts'
 import Stat from '../components/ui/Stat'
 import { Card } from '../components/ui/Card'
@@ -13,7 +13,6 @@ import ActivityFeed from '../components/ActivityFeed'
 export default function Markets() {
   const { positions, isLoading, refetch: refetchPositions } = usePositions()
   const { nextId, activeCount, bundles } = useHookCounters()
-  const { data: price, refetch: refetchPrice } = useCurrentPrice()
   const { data: activity, isLoading: actLoading, refetch: refetchActivity } = useActivity({ limit: 60 })
   const rsc = useReactiveStatus()
 
@@ -28,7 +27,6 @@ export default function Markets() {
 
   const onSwapped = () => {
     refetchPositions()
-    refetchPrice()
     setTimeout(() => {
       refetchPositions()
       refetchActivity()
@@ -70,12 +68,7 @@ export default function Markets() {
         <Stat label="Positions minted" value={nextId !== undefined ? nextId.toString() : '—'} loading={nextId === undefined} />
         <Stat label="Active bonds" value={activeCount !== undefined ? activeCount.toString() : '—'} accent="yield" loading={activeCount === undefined} />
         <Stat label="RSC data bundles" value={bundles !== undefined ? bundles.toString() : '—'} accent="volt" loading={bundles === undefined} />
-        <Stat
-          label="Pool price"
-          value={price ? fmtNum(sqrtPriceToPrice(price.sqrtPriceX96), 4) : '—'}
-          sub={price ? `tick ${price.tick}` : 'reading…'}
-          accent="mint"
-        />
+        <Stat label="Pools" value={POOLS.length.toString()} sub="dynamic-fee markets" accent="mint" />
         <Stat
           label="Avg IL (sold)"
           value={activeSold.length ? fmtBpsPct(avgIL) : '—'}

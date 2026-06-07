@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useReadContract, useReadContracts, useBalance } from 'wagmi'
 import { useQuery } from '@tanstack/react-query'
-import { createPublicClient, http, parseEventLogs } from 'viem'
+import { createPublicClient, http, parseEventLogs, parseAbiItem } from 'viem'
 import {
   ADDR,
   HOOK_ABI,
@@ -11,7 +11,7 @@ import {
   SEPOLIA_CHAIN_ID,
   LASNA_CHAIN_ID,
 } from '../config/contracts'
-import { POOL_ID } from '../config/poolKey'
+import { POOLS, DEMO_POOL, getPoolById, TOKENS } from '../config/pools'
 import { sepolia, LOG_RPC } from '../config/chains'
 import { fetchEventsFromSupabase, supabaseEnabled, nudgeIndexer } from '../lib/supabase'
 import { computeIL, bundleMark } from '../lib/il'
@@ -44,15 +44,43 @@ export function useHookCounters() {
   }
 }
 
-// ── all positions (getPosition + getRange per id) ───────────────────────────
+// ── position → poolId map, derived from PoolManager ModifyLiquidity events ────
+// getPosition() doesn't return the pool, but the hook mints liquidity with
+// salt = bytes32(positionId), so each position's pool is recoverable from the
+// PoolManager's ModifyLiquidity logs (sender = hook). Multi-pool safe.
+const MODIFY_LIQ_EVENT = parseAbiItem(
+  'event ModifyLiquidity(bytes32 indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt)',
+)
+export function usePositionPoolMap() {
+  return useQuery({
+    queryKey: ['posPoolMap', ADDR.hook],
+    refetchInterval: REFRESH,
+    queryFn: async () => {
+      const latest = await logClient.getBlockNumber()
+      const from = latest > LOG_LOOKBACK ? latest - LOG_LOOKBACK : 0n
+      const logs = await logClient.getLogs({
+        address: ADDR.poolManager,
+        event: MODIFY_LIQ_EVENT,
+        args: { sender: ADDR.hook },
+        fromBlock: from,
+        toBlock: 'latest',
+      })
+      const map = {}
+      for (const l of logs) {
+        const pid = Number(BigInt(l.args.salt))
+        if (map[pid] === undefined) map[pid] = String(l.args.id).toLowerCase()
+      }
+      return map
+    },
+  })
+}
+
+// ── all positions (getPosition + getRange per id), annotated with their pool ──
 export function usePositions() {
   const { nextId, refetch: refetchCounters } = useHookCounters()
   const count = nextId !== undefined ? Number(nextId) : 0
-  // Live pool price — lets us mark IL to market client-side instead of relying on
-  // the on-chain `ilMarkBps`, which only updates when the RSC's settleILMark leg
-  // lands (and can stall while swaps/bundles keep flowing).
-  const { data: priceData } = useCurrentPrice()
-  const currentSqrt = priceData?.sqrtPriceX96
+  const { byId: poolStats } = usePoolStats()
+  const { data: poolMap } = usePositionPoolMap()
 
   const contracts = useMemo(() => {
     const arr = []
@@ -77,7 +105,10 @@ export function usePositions() {
       if (!pos) continue
       const [lp, feeHolder, ilHolder, active, ilBondSold, liquidity, entrySqrtPriceX96, ilMarkBps, markValue, askPremium] = pos
       const [tickLower, tickUpper] = range || []
-      // Live IL mark from current price (falls back to the last on-chain mark).
+      // Resolve this position's pool, then mark IL against THAT pool's live price.
+      const poolId = poolMap?.[i]
+      const pool = getPoolById(poolId)
+      const currentSqrt = poolId ? poolStats[poolId.toLowerCase()]?.sqrtPriceX96 : undefined
       const liveIlBps =
         currentSqrt && entrySqrtPriceX96
           ? BigInt(Math.round(computeIL(entrySqrtPriceX96, currentSqrt) * 10000))
@@ -97,10 +128,18 @@ export function usePositions() {
         askPremium,
         tickLower,
         tickUpper,
+        // pool metadata (undefined until the ModifyLiquidity log is in range)
+        pool,
+        poolId,
+        currentSqrtPriceX96: currentSqrt,
+        // premium is paid in the pool's currency1
+        premiumSym: pool?.sym1 || 'token1',
+        premiumDec: pool?.dec1 ?? 18,
+        premiumToken: pool?.token1,
       })
     }
     return out
-  }, [r.data, count, currentSqrt])
+  }, [r.data, count, poolStats, poolMap])
 
   const refetch = () => {
     refetchCounters()
@@ -110,24 +149,97 @@ export function usePositions() {
   return { positions, count, isLoading: r.isLoading || (count > 0 && !r.data), refetch }
 }
 
-// ── current pool price + active liquidity (read from v4 StateView, no logs) ──
-export function useCurrentPrice() {
+// ── current price + liquidity + live dynamic fee for ONE pool (StateView+hook) ─
+export function useCurrentPrice(poolId = DEMO_POOL.id) {
   const r = useReadContracts({
     contracts: [
-      { address: ADDR.stateView, abi: STATEVIEW_ABI, functionName: 'getSlot0', args: [POOL_ID], chainId: SEPOLIA_CHAIN_ID },
-      { address: ADDR.stateView, abi: STATEVIEW_ABI, functionName: 'getLiquidity', args: [POOL_ID], chainId: SEPOLIA_CHAIN_ID },
+      { address: ADDR.stateView, abi: STATEVIEW_ABI, functionName: 'getSlot0', args: [poolId], chainId: SEPOLIA_CHAIN_ID },
+      { address: ADDR.stateView, abi: STATEVIEW_ABI, functionName: 'getLiquidity', args: [poolId], chainId: SEPOLIA_CHAIN_ID },
+      { ...hookBase, functionName: 'currentFee', args: [poolId] },
     ],
     query: { refetchInterval: REFRESH },
   })
   const slot0 = r.data?.[0]?.result
   const liquidity = r.data?.[1]?.result
+  const dynFee = r.data?.[2]?.result
   return {
     data: slot0
-      ? { sqrtPriceX96: slot0[0], tick: Number(slot0[1]), lpFee: Number(slot0[3]), liquidity }
+      ? {
+          sqrtPriceX96: slot0[0],
+          tick: Number(slot0[1]),
+          lpFee: Number(slot0[3]),
+          liquidity,
+          // The live volatility-adjusted fee the pool will charge next swap (pips).
+          dynFee: dynFee !== undefined ? Number(dynFee) : undefined,
+        }
       : undefined,
     refetch: r.refetch,
     isLoading: r.isLoading,
   }
+}
+
+// ── all pools: live slot0 + liquidity + dynamic fee (one multicall) ─────────
+export function usePoolStats() {
+  const contracts = useMemo(() => {
+    const arr = []
+    for (const p of POOLS) {
+      arr.push({ address: ADDR.stateView, abi: STATEVIEW_ABI, functionName: 'getSlot0', args: [p.id], chainId: SEPOLIA_CHAIN_ID })
+      arr.push({ address: ADDR.stateView, abi: STATEVIEW_ABI, functionName: 'getLiquidity', args: [p.id], chainId: SEPOLIA_CHAIN_ID })
+      arr.push({ ...hookBase, functionName: 'currentFee', args: [p.id] })
+    }
+    return arr
+  }, [])
+  const r = useReadContracts({ contracts, query: { refetchInterval: REFRESH } })
+  const byId = useMemo(() => {
+    const m = {}
+    POOLS.forEach((p, i) => {
+      const slot0 = r.data?.[i * 3]?.result
+      const liquidity = r.data?.[i * 3 + 1]?.result
+      const fee = r.data?.[i * 3 + 2]?.result
+      m[p.id.toLowerCase()] = slot0
+        ? {
+            sqrtPriceX96: slot0[0],
+            tick: Number(slot0[1]),
+            lpFee: Number(slot0[3]),
+            liquidity,
+            dynFee: fee !== undefined ? Number(fee) : undefined,
+          }
+        : undefined
+    })
+    return m
+  }, [r.data])
+  return { byId, isLoading: r.isLoading, refetch: r.refetch }
+}
+
+// ── per-pool SwapOccurred price series (on-chain, new hook, recent window) ───
+// Reads directly from the live hook (bypasses Supabase, which indexes the old
+// hook) so per-pool price charts reflect the current deployment immediately.
+export function usePoolSwapSeries() {
+  return useQuery({
+    queryKey: ['poolSwapSeries', ADDR.hook],
+    refetchInterval: REFRESH,
+    queryFn: async () => {
+      const latest = await logClient.getBlockNumber()
+      const from = latest > LOG_LOOKBACK ? latest - LOG_LOOKBACK : 0n
+      const raw = await logClient.getLogs({ address: ADDR.hook, fromBlock: from, toBlock: 'latest' })
+      const decoded = parseEventLogs({ abi: HOOK_ABI, logs: raw })
+      const byPool = {}
+      for (const l of decoded) {
+        if (l.eventName !== 'SwapOccurred') continue
+        const pid = String(l.args.poolId).toLowerCase()
+        ;(byPool[pid] ||= []).push({
+          block: Number(l.blockNumber),
+          idx: Number(l.logIndex),
+          sqrtPriceX96: l.args.sqrtPriceX96,
+          tick: Number(l.args.tick),
+        })
+      }
+      for (const k in byPool) {
+        byPool[k].sort((a, b) => (a.block === b.block ? a.idx - b.idx : a.block - b.block))
+      }
+      return byPool
+    },
+  })
 }
 
 // ── on-chain fallback: events within the ~9500-block (~32h) public-RPC window ─
@@ -204,7 +316,7 @@ export function useActivity({ limit = 50, positionId } = {}) {
 }
 
 // ── per-position history: IL marks + swaps + creation/sale events ───────────
-export function usePositionHistory(positionId) {
+export function usePositionHistory(positionId, poolId) {
   const r = useAllEvents()
   return useMemo(() => {
     const empty = { events: [], ilMarks: [], swaps: [], created: null, sold: null }
@@ -212,11 +324,14 @@ export function usePositionHistory(positionId) {
       return { ...empty, isLoading: r.isLoading }
     }
     const want = Number(positionId)
+    const wantPool = poolId ? String(poolId).toLowerCase() : null
     const events = r.data
       .filter((e) => e.args?.positionId !== undefined && Number(e.args.positionId) === want)
       .sort((a, b) => Number(a.blockNumber - b.blockNumber))
+    // Only this position's pool's swaps (multi-pool safe). If pool unknown, show none
+    // rather than mixing pools.
     const swaps = r.data
-      .filter((e) => e.name === 'SwapOccurred')
+      .filter((e) => e.name === 'SwapOccurred' && (!wantPool || String(e.args?.poolId).toLowerCase() === wantPool))
       .sort((a, b) => Number(a.blockNumber - b.blockNumber))
     const created = events.find((e) => e.name === 'PositionCreated') || null
     const sold = events.find((e) => e.name === 'ILBondSold') || null
@@ -315,16 +430,16 @@ export function useLeaderboardData() {
   }, [r.data, positions, r.isLoading])
 }
 
-// ── per-account token balances + hook allowances ────────────────────────────
-export function useTokenInfo(address) {
+// ── per-account balances + hook allowances for a token pair (default demo) ───
+export function useTokenInfo(address, token0 = ADDR.token0, token1 = ADDR.token1) {
   const r = useReadContracts({
     contracts: [
-      { address: ADDR.token0, abi: ERC20_ABI, functionName: 'balanceOf', args: [address], chainId: SEPOLIA_CHAIN_ID },
-      { address: ADDR.token1, abi: ERC20_ABI, functionName: 'balanceOf', args: [address], chainId: SEPOLIA_CHAIN_ID },
-      { address: ADDR.token0, abi: ERC20_ABI, functionName: 'allowance', args: [address, ADDR.hook], chainId: SEPOLIA_CHAIN_ID },
-      { address: ADDR.token1, abi: ERC20_ABI, functionName: 'allowance', args: [address, ADDR.hook], chainId: SEPOLIA_CHAIN_ID },
+      { address: token0, abi: ERC20_ABI, functionName: 'balanceOf', args: [address], chainId: SEPOLIA_CHAIN_ID },
+      { address: token1, abi: ERC20_ABI, functionName: 'balanceOf', args: [address], chainId: SEPOLIA_CHAIN_ID },
+      { address: token0, abi: ERC20_ABI, functionName: 'allowance', args: [address, ADDR.hook], chainId: SEPOLIA_CHAIN_ID },
+      { address: token1, abi: ERC20_ABI, functionName: 'allowance', args: [address, ADDR.hook], chainId: SEPOLIA_CHAIN_ID },
     ],
-    query: { enabled: !!address, refetchInterval: REFRESH },
+    query: { enabled: !!address && !!token0 && !!token1, refetchInterval: REFRESH },
   })
   const d = r.data || []
   return {
@@ -337,16 +452,22 @@ export function useTokenInfo(address) {
   }
 }
 
-// ── withdrawable balance held in the hook for an account ────────────────────
-export function useWithdrawable(address) {
-  const r = useReadContract({
-    ...hookBase,
-    functionName: 'getWithdrawable',
-    args: [address],
+// ── claimable balances across EVERY registry token (multi-pool) ──────────────
+const TOKEN_LIST = Object.values(TOKENS)
+export function useClaimable(address) {
+  const r = useReadContracts({
+    contracts: TOKEN_LIST.map((t) => ({ ...hookBase, functionName: 'getClaimable', args: [address, t.address] })),
     query: { enabled: !!address, refetchInterval: REFRESH },
   })
-  const [amount0, amount1] = r.data || []
-  return { amount0, amount1, isLoading: r.isLoading, refetch: r.refetch }
+  const claims = useMemo(() => {
+    const out = []
+    TOKEN_LIST.forEach((t, i) => {
+      const amount = r.data?.[i]?.result
+      if (amount && amount > 0n) out.push({ token: t.address, sym: t.symbol, dec: t.decimals, amount })
+    })
+    return out
+  }, [r.data])
+  return { claims, isLoading: r.isLoading, refetch: r.refetch }
 }
 
 // ── Reactive contract status on Lasna ───────────────────────────────────────

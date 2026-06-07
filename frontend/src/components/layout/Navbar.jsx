@@ -7,6 +7,7 @@ const LINKS = [
   { to: '/', label: 'Home', end: true, tip: 'The pitch in ten seconds — fees without the loss' },
   { to: '/create', label: 'Create', tip: 'Mint an IL-bond: split your LP into a fee leg + a risk leg' },
   { to: '/hunt', label: 'Hunt', tip: 'Browse live bonds for sale and buy the IL risk leg' },
+  { to: '/pools', label: 'Pools', tip: 'All dynamic-fee pools — live price, trend & fee' },
   { to: '/markets', label: 'Markets', tip: 'Every position, marked to market in real time' },
   { to: '/leaders', label: 'Leaders', tip: 'Top fee earners, hunters & risk holders' },
   { to: '/dashboard', label: 'Dashboard', tip: 'Your positions, live IL marks & P&L' },
@@ -81,7 +82,7 @@ export default function Navbar() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-3 sm:gap-3 sm:px-6">
           <Logo />
 
-          <nav className="hidden items-center gap-3 lg:flex">
+          <nav className="hidden items-center gap-2 xl:flex">
             {LINKS.map((l) => (
               <Item key={l.to} {...l} />
             ))}
@@ -90,7 +91,7 @@ export default function Navbar() {
           <div className="flex items-center gap-2">
             <WalletButton />
             <button
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-md border-2 border-white/15 text-bone lg:hidden"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-md border-2 border-white/15 text-bone xl:hidden"
               onClick={() => setOpen((v) => !v)}
               aria-label="menu"
               aria-expanded={open}
@@ -105,7 +106,7 @@ export default function Navbar() {
         </div>
 
         {open && (
-          <nav className="flex flex-col gap-1 border-t border-white/10 bg-ink/95 px-4 py-3 backdrop-blur-xl lg:hidden">
+          <nav className="flex flex-col gap-1 border-t border-white/10 bg-ink/95 px-4 py-3 backdrop-blur-xl xl:hidden">
             {LINKS.map((l) => (
               <MobileItem key={l.to} {...l} onClick={() => setOpen(false)} />
             ))}

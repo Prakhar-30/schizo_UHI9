@@ -1,7 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
+import { ADDR } from '../config/contracts'
 
 const URL = import.meta.env.VITE_SUPABASE_URL
 const KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+const HOOK_ADDR = ADDR.hook.toLowerCase()
 
 // Read-only public client. Writes happen server-side in api/index-events.js with
 // the service-role key. If the env vars are missing, callers fall back to chain.
@@ -56,6 +58,7 @@ export async function fetchEventsFromSupabase() {
     const { data, error } = await supabase
       .from('hook_events')
       .select('*')
+      .eq('hook_address', HOOK_ADDR) // only the active deployment's events
       .order('block_number', { ascending: true })
       .order('log_index', { ascending: true })
       .range(from, from + PAGE - 1)

@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react'
 import { useAccount, usePublicClient } from 'wagmi'
 import { Link } from 'react-router-dom'
 import { maxUint256 } from 'viem'
-import { usePositions, useHookCounters, useReactiveStatus, useCurrentPrice } from '../hooks/reads'
+import { usePositions, useHookCounters, useReactiveStatus } from '../hooks/reads'
+import { POOLS } from '../config/pools'
 import OutcomeStrip from '../components/OutcomeStrip'
-import { sqrtPriceToPrice } from '../lib/il'
-import { fmtToken, fmtBpsPct, isSameAddr } from '../lib/format'
+import { fmtToken, isSameAddr } from '../lib/format'
 import { ADDR, HOOK_ABI, ERC20_ABI, SEPOLIA_CHAIN_ID, sepoliaAddr } from '../config/contracts'
 import { useTx } from '../hooks/useTx'
 import { Card } from '../components/ui/Card'
@@ -26,28 +26,25 @@ const SORTS = [
 
 const hookBase = { address: ADDR.hook, abi: HOOK_ABI }
 
-function HuntRow({ position, marked, busyId, currentSqrtPriceX96, onBuy }) {
-  const { id, lp, askPremium, ilMarkBps, liquidity, entrySqrtPriceX96 } = position
+function HuntRow({ position, marked, busyId, onBuy }) {
+  const { id, lp, askPremium, ilMarkBps, liveIlBps, liquidity, entrySqrtPriceX96 } = position
   const busy = busyId === id
   const [open, setOpen] = useState(false)
+  const displayIl = liveIlBps !== undefined ? liveIlBps : ilMarkBps
+  const premSym = position.premiumSym || 'token1'
 
   return (
     <Card className="flex flex-col gap-4 p-4 transition-colors hover:border-volt/30 sm:p-5">
       <div className="flex flex-col gap-4 md:flex-row md:items-center">
-        {/* id + lp */}
-        <Link
-          to={`/positions/${id}`}
-          className="flex items-center gap-3 hover:text-volt md:w-32"
-        >
+        {/* id + pool */}
+        <Link to={`/positions/${id}`} className="flex items-center gap-3 hover:text-volt md:w-36">
           <span className="font-black text-2xl">#{id}</span>
-          <Chip color="amber">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber" /> IL-T open
-          </Chip>
+          <Chip color="volt">{position.pool?.label || '—'}</Chip>
         </Link>
 
         {/* IL gauge */}
-        <div className="md:w-56">
-          <ILGauge ilMarkBps={ilMarkBps} marked={marked} compact />
+        <div className="md:w-52">
+          <ILGauge ilMarkBps={displayIl} marked={marked} compact />
         </div>
 
         {/* numbers */}
@@ -55,7 +52,7 @@ function HuntRow({ position, marked, busyId, currentSqrtPriceX96, onBuy }) {
           <div className="min-w-0">
             <p className="kicker truncate">Premium</p>
             <p className="mt-0.5 truncate font-mono text-base font-bold tabular-nums text-yield">
-              {fmtToken(askPremium)} BETA
+              {fmtToken(askPremium, position.premiumDec)} {premSym}
             </p>
           </div>
           <div className="min-w-0">
@@ -89,7 +86,7 @@ function HuntRow({ position, marked, busyId, currentSqrtPriceX96, onBuy }) {
           <div className="mt-3">
             <OutcomeStrip
               entrySqrtPriceX96={entrySqrtPriceX96}
-              currentSqrtPriceX96={currentSqrtPriceX96}
+              currentSqrtPriceX96={position.currentSqrtPriceX96}
               askPremium={askPremium}
               liquidity={liquidity}
               compact
@@ -106,7 +103,6 @@ export default function Hunt() {
   const publicClient = usePublicClient({ chainId: SEPOLIA_CHAIN_ID })
   const { positions, isLoading, refetch } = usePositions()
   const { nextId, activeCount, bundles } = useHookCounters()
-  const { data: price } = useCurrentPrice()
   const rsc = useReactiveStatus()
   const { run, pending } = useTx()
   const [busyId, setBusyId] = useState(null)
@@ -156,25 +152,22 @@ export default function Hunt() {
     return arr
   }, [buyable, sort])
 
-  const totalPremium = useMemo(
-    () => buyable.reduce((s, p) => s + (typeof p.askPremium === 'bigint' ? p.askPremium : 0n), 0n),
-    [buyable],
-  )
-
   async function handleBuy(position) {
     if (!isConnected) return
     setBusyId(position.id)
     try {
+      const premiumToken = position.premiumToken || ADDR.token1
+      const premSym = position.premiumSym || 'token1'
       const allowance = await publicClient.readContract({
-        address: ADDR.token1,
+        address: premiumToken,
         abi: ERC20_ABI,
         functionName: 'allowance',
         args: [address, ADDR.hook],
       })
       if (allowance < position.askPremium) {
         const ok = await run(
-          { address: ADDR.token1, abi: ERC20_ABI, functionName: 'approve', args: [ADDR.hook, maxUint256] },
-          { pendingMsg: 'Approving BETA…', successMsg: 'BETA approved' },
+          { address: premiumToken, abi: ERC20_ABI, functionName: 'approve', args: [ADDR.hook, maxUint256] },
+          { pendingMsg: `Approving ${premSym}…`, successMsg: `${premSym} approved` },
         )
         if (!ok) return
       }
@@ -221,17 +214,8 @@ export default function Hunt() {
           sub={`of ${positions.filter((p) => p.active).length} active`}
           accent="amber"
         />
-        <Stat
-          label="Total premium open"
-          value={`${fmtToken(totalPremium)} BETA`}
-          accent="yield"
-        />
-        <Stat
-          label="Pool price"
-          value={price ? Number(sqrtPriceToPrice(price.sqrtPriceX96)).toFixed(4) : '—'}
-          sub={price ? `tick ${price.tick}` : 'reading…'}
-          accent="mint"
-        />
+        <Stat label="Active bonds" value={activeCount !== undefined ? activeCount.toString() : '—'} accent="yield" />
+        <Stat label="Pools" value={POOLS.length.toString()} sub="dynamic-fee markets" accent="mint" />
         <Stat
           label="RSC marks posted"
           value={bundles !== undefined ? bundles.toString() : '—'}
@@ -319,7 +303,6 @@ export default function Hunt() {
                 position={p}
                 marked={bundles > 0n}
                 busyId={pending ? busyId : null}
-                currentSqrtPriceX96={price?.sqrtPriceX96}
                 onBuy={handleBuy}
               />
             ))}

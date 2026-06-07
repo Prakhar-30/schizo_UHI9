@@ -37,6 +37,7 @@ contract ILBondReactive is IReactive, AbstractPausableReactive {
     struct PositionData {
         uint256 positionId;
         uint160 entrySqrtPriceX96;
+        uint160 currentSqrtPriceX96;   // per-pool current price (multi-pool safe)
         uint160 sqrtPriceLower;
         uint160 sqrtPriceUpper;
         uint128 liquidity;
@@ -115,11 +116,11 @@ contract ILBondReactive is IReactive, AbstractPausableReactive {
     // ── Compute IL marks in ReactVM ────────────────────────────────────────
     function _processBundle(LogRecord calldata log) internal {
         bytes memory raw = abi.decode(log.data, (bytes));
-        (uint160 currentSqrt, PositionData[] memory pts) = abi.decode(raw, (uint160, PositionData[]));
+        PositionData[] memory pts = abi.decode(raw, (PositionData[]));
 
         for (uint256 i; i < pts.length; ++i) {
             PositionData memory p = pts[i];
-            (int256 ilBps, uint256 markValue) = _computeILMark(p, currentSqrt);
+            (int256 ilBps, uint256 markValue) = _computeILMark(p);
 
             emit Callback(
                 destChainId,
@@ -139,15 +140,22 @@ contract ILBondReactive is IReactive, AbstractPausableReactive {
     /// @notice Compute IL relative to entry price, returning signed BPS.
     ///         Negative means the position has lost value vs HODL → IL-T holder is "down".
     ///         Positive means the position has outperformed HODL (rare for v3-style positions).
-    function _computeILMark(PositionData memory p, uint160 currentSqrt)
+    function _computeILMark(PositionData memory p)
         internal pure returns (int256 ilBps, uint256 markValue)
     {
+        uint160 currentSqrt = p.currentSqrtPriceX96;
         if (p.entrySqrtPriceX96 == 0 || currentSqrt == 0 || p.liquidity == 0) {
             return (0, 0);
         }
 
         // Standard IL formula: IL = 1 - 2*sqrt(r)/(1+r)  where r = (currentP/entryP)
         uint256 sqrtR = uint256(currentSqrt) * PRECISION / uint256(p.entrySqrtPriceX96);
+        // At extreme price divergence IL saturates to ~100%. Guard here also prevents
+        // sqrtR*sqrtR from overflowing (sqrtR can reach ~3.4e56 over the valid
+        // sqrtPrice range) — which would otherwise revert and brick the whole bundle.
+        if (sqrtR >= (uint256(1) << 128)) {
+            return (-int256(BPS), 0);
+        }
         uint256 r = sqrtR * sqrtR / PRECISION;
         uint256 num = 2 * sqrtR * BPS;
         uint256 denom = PRECISION + r;

@@ -5,11 +5,10 @@ import { maxUint256, isAddress } from 'viem'
 import SharePanel from '../components/SharePanel'
 import {
   usePositions,
-  useCurrentPrice,
   usePositionHistory,
   useHookCounters,
 } from '../hooks/reads'
-import { sqrtPriceToPrice } from '../lib/il'
+import { sqrtPriceToPrice, humanPrice } from '../lib/il'
 import { fmtToken, fmtNum, fmtBpsPct, isSameAddr } from '../lib/format'
 import { ADDR, HOOK_ABI, ERC20_ABI, SEPOLIA_CHAIN_ID, sepoliaAddr, sepoliaTx } from '../config/contracts'
 import { useTx } from '../hooks/useTx'
@@ -36,10 +35,9 @@ export default function PositionDetail() {
   const { toast } = useToast()
 
   const { positions, isLoading, refetch } = usePositions()
-  const { data: priceData } = useCurrentPrice()
-  const { bundles } = useHookCounters()
-  const history = usePositionHistory(positionId)
   const position = positions.find((p) => Number(p.id) === positionId)
+  const { bundles } = useHookCounters()
+  const history = usePositionHistory(positionId, position?.poolId)
 
   const [transfer, setTransfer] = useState(null) // 'fee' | 'il' | null
   const [to, setTo] = useState('')
@@ -95,21 +93,31 @@ export default function PositionDetail() {
   const canBuy = active && !ilBondSold && askPremium > 0n && isConnected && !isIl
   const canExit = active && involved
 
-  const entryPrice = sqrtPriceToPrice(entrySqrtPriceX96)
-  const currentPrice = priceData ? sqrtPriceToPrice(priceData.sqrtPriceX96) : 0
+  const dec0 = position.pool?.dec0 ?? 18
+  const dec1 = position.pool?.dec1 ?? 18
+  const premSym = position.premiumSym || 'token1'
+  const premDec = position.premiumDec ?? 18
+  const premiumToken = position.premiumToken || ADDR.token1
+  const pairLabel = position.pool?.label || 'pair'
+
+  // Raw price for the candle chart (consistent with its raw swap prices);
+  // human price for the headline stats.
+  const chartEntryRaw = sqrtPriceToPrice(entrySqrtPriceX96)
+  const entryPrice = humanPrice(entrySqrtPriceX96, dec0, dec1)
+  const currentPrice = position.currentSqrtPriceX96 ? humanPrice(position.currentSqrtPriceX96, dec0, dec1) : 0
   const priceMovePct = entryPrice && currentPrice ? ((currentPrice / entryPrice) - 1) * 100 : 0
 
   async function handleBuy() {
     const allowance = await publicClient.readContract({
-      address: ADDR.token1,
+      address: premiumToken,
       abi: ERC20_ABI,
       functionName: 'allowance',
       args: [address, ADDR.hook],
     })
     if (allowance < askPremium) {
       const ok = await run(
-        { address: ADDR.token1, abi: ERC20_ABI, functionName: 'approve', args: [ADDR.hook, maxUint256] },
-        { pendingMsg: 'Approving BETA…', successMsg: 'BETA approved' },
+        { address: premiumToken, abi: ERC20_ABI, functionName: 'approve', args: [ADDR.hook, maxUint256] },
+        { pendingMsg: `Approving ${premSym}…`, successMsg: `${premSym} approved` },
       )
       if (!ok) return
     }
@@ -173,13 +181,13 @@ export default function PositionDetail() {
             </Chip>
           </h1>
           <p className="mt-2 font-mono text-xs text-bone/40 sm:text-sm">
-            tick {tickLower} → {tickUpper} · entry {fmtNum(entryPrice, 4)}
+            {pairLabel} · tick {tickLower} → {tickUpper} · entry {fmtNum(entryPrice, 6)}
           </p>
         </div>
 
         {canBuy && (
           <Button variant="risk" size="lg" loading={pending} onClick={handleBuy}>
-            Buy IL-T · {fmtToken(askPremium)} BETA
+            Buy IL-T · {fmtToken(askPremium, premDec)} {premSym}
           </Button>
         )}
       </div>
@@ -194,7 +202,7 @@ export default function PositionDetail() {
         />
         <Stat
           label="Premium"
-          value={`${fmtToken(askPremium)} BETA`}
+          value={`${fmtToken(askPremium, premDec)} ${premSym}`}
           accent="yield"
           sub={ilBondSold ? 'already paid' : 'ask price'}
         />
@@ -207,7 +215,7 @@ export default function PositionDetail() {
           label="Price move"
           value={`${priceMovePct >= 0 ? '+' : ''}${priceMovePct.toFixed(2)}%`}
           accent={Math.abs(priceMovePct) > 5 ? 'risk' : 'mint'}
-          sub={`entry ${fmtNum(entryPrice, 4)} → now ${fmtNum(currentPrice, 4)}`}
+          sub={`entry ${fmtNum(entryPrice, 6)} → now ${fmtNum(currentPrice, 6)}`}
         />
       </div>
 
@@ -220,7 +228,7 @@ export default function PositionDetail() {
           <PositionChart
             ilMarks={history.ilMarks}
             swaps={history.swaps}
-            entryPrice={entryPrice}
+            entryPrice={chartEntryRaw}
           />
 
           {/* gauge */}
@@ -234,7 +242,7 @@ export default function PositionDetail() {
           {/* outcome calculator */}
           <OutcomeStrip
             entrySqrtPriceX96={entrySqrtPriceX96}
-            currentSqrtPriceX96={priceData?.sqrtPriceX96}
+            currentSqrtPriceX96={position.currentSqrtPriceX96}
             askPremium={askPremium}
             liquidity={liquidity}
           />

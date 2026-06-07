@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Kicker } from './ui/Bits'
 import { fmtBpsPct, fmtNum, timeAgo } from '../lib/format'
 import { sqrtPriceToPrice } from '../lib/il'
@@ -74,6 +74,15 @@ function CandleChart({ data, entryPrice }) {
   const H = 260
   const PAD = { l: 10, r: 58, t: 16, b: 24 }
   const [hover, setHover] = useState(null)
+
+  // Live candle flicker: randomly oscillate the most-recent candle between green
+  // and red on a short interval for a "live ticker" feel (pattern is random).
+  const [liveUp, setLiveUp] = useState(true)
+  useEffect(() => {
+    const id = setInterval(() => setLiveUp(Math.random() > 0.5), 650)
+    return () => clearInterval(id)
+  }, [])
+  const liveColor = liveUp ? UP : DOWN
 
   const model = useMemo(() => {
     if (!data.length) return null
@@ -230,13 +239,14 @@ function CandleChart({ data, entryPrice }) {
           {/* candles */}
           {candles.map((c, i) => {
             const x = cx(i)
-            const color = c.up ? UP : DOWN
+            const isLast = i === candles.length - 1
+            // The live candle flickers green/red; the rest keep their true colour.
+            const color = isLast ? liveColor : c.up ? UP : DOWN
             const yO = sy(c.open)
             const yC = sy(c.close)
             const top = Math.min(yO, yC)
             const bh = Math.max(Math.abs(yO - yC), 1.2)
             const isHover = hover === i
-            const isLast = i === candles.length - 1
             return (
               <g key={i} opacity={hover != null && !isHover ? 0.55 : 1}>
                 {/* wick */}
@@ -268,17 +278,17 @@ function CandleChart({ data, entryPrice }) {
                       x2={x}
                       y1={sy(c.high)}
                       y2={sy(c.low)}
-                      stroke={LIVE}
+                      stroke={liveColor}
                       strokeWidth="1.4"
                       vectorEffect="non-scaling-stroke"
                     >
                       <animate attributeName="opacity" values="0;0.9;0" dur="1.6s" repeatCount="indefinite" />
                     </line>
-                    <circle cx={x} cy={sy(c.close)} r="3" fill={LIVE}>
-                      <animate attributeName="r" values="3;7;3" dur="1.6s" repeatCount="indefinite" />
+                    <circle cx={x} cy={sy(c.close)} r="3" fill={liveColor}>
+                      <animate attributeName="r" values="3;8;3" dur="1.6s" repeatCount="indefinite" />
                       <animate attributeName="opacity" values="0.9;0;0.9" dur="1.6s" repeatCount="indefinite" />
                     </circle>
-                    <circle cx={x} cy={sy(c.close)} r="2.2" fill={LIVE} />
+                    <circle cx={x} cy={sy(c.close)} r="2.4" fill={liveColor} />
                   </g>
                 )}
                 {/* hover hit-area */}

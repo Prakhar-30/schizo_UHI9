@@ -13,13 +13,18 @@ create table if not exists public.hook_events (
   position_id  bigint,            -- null for pool-wide events (SwapOccurred, CycleCompleted)
   block_number bigint  not null,
   block_ts     bigint  not null,  -- unix seconds
+  hook_address text,              -- which hook deployment emitted this (v2 multi-pool)
   args         jsonb   not null,  -- decoded event args; bigints stored as decimal strings
   primary key (tx_hash, log_index)
 );
 
+-- If the table already exists from the v1 deployment, add the new column:
+alter table public.hook_events add column if not exists hook_address text;
+
 create index if not exists hook_events_position_id_idx on public.hook_events (position_id);
 create index if not exists hook_events_block_number_idx on public.hook_events (block_number);
 create index if not exists hook_events_event_name_idx  on public.hook_events (event_name);
+create index if not exists hook_events_hook_address_idx on public.hook_events (hook_address);
 
 -- Tracks how far the indexer has scanned so it can resume incrementally.
 create table if not exists public.indexer_state (

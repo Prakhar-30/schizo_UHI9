@@ -58,6 +58,17 @@ contract ILBondHook is BaseHook, AbstractCallback, IUnlockCallback {
     event ILTokenTransferred(uint256 indexed positionId, address indexed from, address indexed to);
     event ILBondDataBundle(uint256 indexed bundleId, bytes data);
     event CycleCompleted(uint256 timestamp, uint256 positionsChecked);
+    /// @notice Emitted once per pool the first time it is initialized with this hook.
+    ///         Lets a frontend discover every pool the hook manages (multi-pool).
+    event PoolRegistered(
+        PoolId indexed poolId,
+        address currency0,
+        address currency1,
+        int24 tickSpacing,
+        uint160 sqrtPriceX96
+    );
+    /// @notice Emitted whenever the volatility-driven LP fee changes for a pool.
+    event DynamicFeeUpdated(PoolId indexed poolId, uint24 newFeePips, uint256 volEwma);
 
     // ══════════════════════════════════════════════════════════════════════
     //                          DATA STRUCTURES
@@ -82,14 +93,17 @@ contract ILBondHook is BaseHook, AbstractCallback, IUnlockCallback {
     struct PositionData {
         uint256 positionId;
         uint160 entrySqrtPriceX96;
+        uint160 currentSqrtPriceX96;   // this position's pool price NOW (per-pool, multi-pool safe)
         uint160 sqrtPriceLower;
         uint160 sqrtPriceUpper;
         uint128 liquidity;
     }
 
-    struct WithdrawableBalance {
-        uint256 amount0;
-        uint256 amount1;
+    /// @notice Per-pool state backing the volatility-driven dynamic fee.
+    struct PoolFeeState {
+        int24 lastTick;       // tick recorded after the previous swap
+        uint256 volEwma;      // EWMA of |Δtick| per swap — a realized-volatility proxy
+        bool initialized;
     }
 
     enum CallbackAction { ADD_LIQUIDITY, REMOVE_LIQUIDITY }
@@ -108,7 +122,10 @@ contract ILBondHook is BaseHook, AbstractCallback, IUnlockCallback {
     //                            CONSTANTS
     // ══════════════════════════════════════════════════════════════════════
 
-    uint24 public constant BASE_FEE = 3000;
+    uint24 public constant BASE_FEE = 3000;       // 0.30% — fee floor in calm markets
+    uint24 public constant MAX_FEE = 30000;       // 3.00% — fee ceiling in turbulent markets
+    uint256 public constant VOL_WINDOW = 8;       // EWMA smoothing window for realized volatility
+    uint256 public constant VOL_SENSITIVITY = 2;  // pips of extra fee per (2 EWMA-ticks) of volatility
     uint256 public constant BPS = 10000;
     uint256 public constant PRECISION = 1e18;
 
@@ -119,12 +136,14 @@ contract ILBondHook is BaseHook, AbstractCallback, IUnlockCallback {
     uint256 public nextPositionId;
     uint256 public bundleCounter;
     mapping(uint256 => Position) internal _positions;
-    mapping(address => WithdrawableBalance) public withdrawable;
+    // Claimable balances keyed per-token (multi-pool safe): user => token => amount.
+    mapping(address => mapping(address => uint256)) public claimable;
 
     // Track active positions for the RC bundle
     uint256[] public activePositionIds;
     mapping(uint256 => uint256) internal _activeIndex;
     mapping(PoolId => bool) public poolInitialized;
+    mapping(PoolId => PoolFeeState) public poolFeeState;
 
     // ══════════════════════════════════════════════════════════════════════
     //                           CONSTRUCTOR
@@ -158,20 +177,35 @@ contract ILBondHook is BaseHook, AbstractCallback, IUnlockCallback {
         });
     }
 
-    function _afterInitialize(address, PoolKey calldata key, uint160, int24)
+    function _afterInitialize(address, PoolKey calldata key, uint160 sqrtPriceX96, int24 tick)
         internal override returns (bytes4)
     {
-        poolInitialized[key.toId()] = true;
+        PoolId poolId = key.toId();
+        poolInitialized[poolId] = true;
+        // Seed the fee state at the pool's opening tick so volatility is measured
+        // from initialization, and the first swap is charged the base fee.
+        poolFeeState[poolId] = PoolFeeState({lastTick: tick, volEwma: 0, initialized: true});
+        emit PoolRegistered(
+            poolId,
+            Currency.unwrap(key.currency0),
+            Currency.unwrap(key.currency1),
+            key.tickSpacing,
+            sqrtPriceX96
+        );
         return BaseHook.afterInitialize.selector;
     }
 
-    function _beforeSwap(address, PoolKey calldata, SwapParams calldata, bytes calldata)
-        internal pure override returns (bytes4, BeforeSwapDelta, uint24)
+    /// @dev Dynamic fee: charge the volatility-adjusted fee computed from prior
+    ///      swaps. beforeSwap fires before this swap mutates price, so the fee is
+    ///      a causal function of *realized* volatility up to (not including) now.
+    function _beforeSwap(address, PoolKey calldata key, SwapParams calldata, bytes calldata)
+        internal view override returns (bytes4, BeforeSwapDelta, uint24)
     {
+        uint24 fee = _dynamicFee(key.toId());
         return (
             BaseHook.beforeSwap.selector,
             BeforeSwapDeltaLibrary.ZERO_DELTA,
-            LPFeeLibrary.OVERRIDE_FEE_FLAG | BASE_FEE
+            LPFeeLibrary.OVERRIDE_FEE_FLAG | fee
         );
     }
 
@@ -181,8 +215,40 @@ contract ILBondHook is BaseHook, AbstractCallback, IUnlockCallback {
         PoolId poolId = key.toId();
         (uint160 sqrtPriceX96, int24 tick,,) = poolManager.getSlot0(poolId);
         uint128 liquidity = poolManager.getLiquidity(poolId);
+
+        // Update the realized-volatility EWMA from how far this swap moved the tick.
+        PoolFeeState storage st = poolFeeState[poolId];
+        if (!st.initialized) {
+            st.lastTick = tick;
+            st.initialized = true;
+        } else {
+            uint256 delta = _absTickDelta(tick, st.lastTick);
+            // EWMA: vol = (vol*(W-1) + delta) / W
+            st.volEwma = (st.volEwma * (VOL_WINDOW - 1) + delta) / VOL_WINDOW;
+            st.lastTick = tick;
+            emit DynamicFeeUpdated(poolId, _dynamicFee(poolId), st.volEwma);
+        }
+
         emit SwapOccurred(poolId, sqrtPriceX96, tick, liquidity);
         return (BaseHook.afterSwap.selector, 0);
+    }
+
+    // ── Dynamic-fee helpers ────────────────────────────────────────────────
+
+    /// @notice The fee (in pips) the pool will charge on the next swap, given its
+    ///         current realized-volatility state. Exposed for the UI.
+    function currentFee(PoolId poolId) external view returns (uint24) {
+        return _dynamicFee(poolId);
+    }
+
+    function _dynamicFee(PoolId poolId) internal view returns (uint24) {
+        uint256 fee = uint256(BASE_FEE) + poolFeeState[poolId].volEwma / VOL_SENSITIVITY;
+        if (fee > MAX_FEE) fee = MAX_FEE;
+        return uint24(fee);
+    }
+
+    function _absTickDelta(int24 a, int24 b) internal pure returns (uint256) {
+        return a >= b ? uint256(int256(a) - int256(b)) : uint256(int256(b) - int256(a));
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -272,7 +338,7 @@ contract ILBondHook is BaseHook, AbstractCallback, IUnlockCallback {
         address prevILHolder = pos.ilHolder;
         pos.ilHolder = msg.sender;
         pos.ilBondSold = true;
-        withdrawable[pos.feeHolder].amount1 += ask;
+        claimable[pos.feeHolder][Currency.unwrap(premiumCurrency)] += ask;
 
         emit ILTokenTransferred(positionId, prevILHolder, msg.sender);
         emit ILBondSold(positionId, msg.sender, ask);
@@ -324,25 +390,24 @@ contract ILBondHook is BaseHook, AbstractCallback, IUnlockCallback {
             return;
         }
 
-        // Use first position's pool to read current price (we assume RC subscribes per-pool)
-        Position storage first = _positions[activePositionIds[0]];
-        PoolId poolId = first.poolKey.toId();
-        (uint160 currentSqrt,,,) = poolManager.getSlot0(poolId);
-
+        // Multi-pool safe: read EACH position's own pool price, so positions across
+        // different pools are marked against the correct current price.
         PositionData[] memory pts = new PositionData[](n);
         for (uint256 i; i < n; ++i) {
             uint256 pid = activePositionIds[i];
             Position storage p = _positions[pid];
+            (uint160 currentSqrt,,,) = poolManager.getSlot0(p.poolKey.toId());
             pts[i] = PositionData({
                 positionId: pid,
                 entrySqrtPriceX96: p.entrySqrtPriceX96,
+                currentSqrtPriceX96: currentSqrt,
                 sqrtPriceLower: TickMath.getSqrtPriceAtTick(p.tickLower),
                 sqrtPriceUpper: TickMath.getSqrtPriceAtTick(p.tickUpper),
                 liquidity: p.liquidity
             });
         }
 
-        bytes memory pkg = abi.encode(currentSqrt, pts);
+        bytes memory pkg = abi.encode(pts);
         emit ILBondDataBundle(bundleCounter++, pkg);
     }
 
@@ -378,8 +443,9 @@ contract ILBondHook is BaseHook, AbstractCallback, IUnlockCallback {
         // IL-T holder receives the underlying composition (bears IL outcome).
         // FEE-T holder already received the premium (and would receive accumulated swap fees
         // in a full implementation — out of scope for this simplified vault).
-        withdrawable[pos.ilHolder].amount0 += amt0;
-        withdrawable[pos.ilHolder].amount1 += amt1;
+        // Credited per-token off this position's own pool so it is multi-pool safe.
+        if (amt0 > 0) claimable[pos.ilHolder][Currency.unwrap(pos.poolKey.currency0)] += amt0;
+        if (amt1 > 0) claimable[pos.ilHolder][Currency.unwrap(pos.poolKey.currency1)] += amt1;
 
         pos.active = false;
         pos.liquidity = 0;
@@ -387,18 +453,16 @@ contract ILBondHook is BaseHook, AbstractCallback, IUnlockCallback {
         emit PositionExited(positionId);
     }
 
+    /// @notice Claim the full balance owed to the caller in a specific token.
+    ///         Per-token, so callers with proceeds in both tokens of a pool (or
+    ///         across multiple pools) call this once per token.
     function withdraw(Currency currency) external {
-        WithdrawableBalance storage bal = withdrawable[msg.sender];
-        uint256 amt0 = bal.amount0;
-        uint256 amt1 = bal.amount1;
-        if (amt0 == 0 && amt1 == 0) revert NothingToWithdraw();
-        bal.amount0 = 0;
-        bal.amount1 = 0;
-        if (amt0 > 0 && !currency.isAddressZero()) {
-            IERC20Minimal(Currency.unwrap(currency)).transfer(msg.sender, amt0);
-        }
-        if (amt1 > 0 && !currency.isAddressZero()) {
-            IERC20Minimal(Currency.unwrap(currency)).transfer(msg.sender, amt1);
+        address token = Currency.unwrap(currency);
+        uint256 amt = claimable[msg.sender][token];
+        if (amt == 0) revert NothingToWithdraw();
+        claimable[msg.sender][token] = 0;
+        if (!currency.isAddressZero()) {
+            IERC20Minimal(token).transfer(msg.sender, amt);
         }
     }
 
@@ -451,9 +515,9 @@ contract ILBondHook is BaseHook, AbstractCallback, IUnlockCallback {
         return activePositionIds.length;
     }
 
-    function getWithdrawable(address user) external view returns (uint256, uint256) {
-        WithdrawableBalance storage b = withdrawable[user];
-        return (b.amount0, b.amount1);
+    /// @notice Claimable balance for `user` in a specific `token`.
+    function getClaimable(address user, address token) external view returns (uint256) {
+        return claimable[user][token];
     }
 
     // ══════════════════════════════════════════════════════════════════════

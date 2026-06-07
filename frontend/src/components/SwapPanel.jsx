@@ -1,63 +1,65 @@
 import { useMemo, useState } from 'react'
 import { useAccount, usePublicClient } from 'wagmi'
 import { parseUnits, formatUnits, maxUint256 } from 'viem'
-import {
-  ADDR,
-  ERC20_ABI,
-  SWAP_ROUTER_ABI,
-  SEPOLIA_CHAIN_ID,
-} from '../config/contracts'
-import { POOL_KEY } from '../config/poolKey'
+import { ADDR, ERC20_ABI, SWAP_ROUTER_ABI, SEPOLIA_CHAIN_ID } from '../config/contracts'
+import { usePool } from '../context/PoolContext'
 import { useTokenInfo, useCurrentPrice } from '../hooks/reads'
 import { useTx } from '../hooks/useTx'
 import { useToast } from './ui/Toast'
 import { fmtToken, fmtNum } from '../lib/format'
-import { sqrtPriceToPrice } from '../lib/il'
+import { humanPrice } from '../lib/il'
 import { quoteExactInput } from '../lib/quote'
 import { Card } from './ui/Card'
 import { Kicker, Chip, Dot } from './ui/Bits'
 import Button from './ui/Button'
+import PoolSelector from './PoolSelector'
 
 const SLIPPAGE_PRESETS = ['0.5', '1', '1.5', '3']
 const DEFAULT_SLIPPAGE = '1.5'
 
-function safeParse(v) {
+function safeParse(v, decimals) {
   try {
     if (!v || Number(v) <= 0) return 0n
-    return parseUnits(String(v), 18)
+    return parseUnits(String(v), decimals)
   } catch {
     return 0n
   }
 }
 
 export default function SwapPanel({ onSwapped }) {
+  const { pool } = usePool()
   const { address, isConnected } = useAccount()
   const publicClient = usePublicClient({ chainId: SEPOLIA_CHAIN_ID })
   const { run, pending } = useTx()
   const { toast } = useToast()
-  const { bal0, bal1, refetch } = useTokenInfo(address)
-  const { data: priceData } = useCurrentPrice()
+  const { bal0, bal1, refetch } = useTokenInfo(address, pool.token0, pool.token1)
+  const { data: priceData } = useCurrentPrice(pool.id)
 
-  const [zeroForOne, setZeroForOne] = useState(true) // ALPHA → BETA
-  const [amount, setAmount] = useState('5')
+  const [zeroForOne, setZeroForOne] = useState(true)
+  const [amount, setAmount] = useState('1')
   const [slippage, setSlippage] = useState(DEFAULT_SLIPPAGE)
 
-  const tokenIn = zeroForOne ? ADDR.token0 : ADDR.token1
-  const symIn = zeroForOne ? 'ALPHA' : 'BETA'
-  const symOut = zeroForOne ? 'BETA' : 'ALPHA'
+  const tokenIn = zeroForOne ? pool.token0 : pool.token1
+  const symIn = zeroForOne ? pool.sym0 : pool.sym1
+  const symOut = zeroForOne ? pool.sym1 : pool.sym0
+  const decIn = zeroForOne ? pool.dec0 : pool.dec1
+  const decOut = zeroForOne ? pool.dec1 : pool.dec0
   const balIn = zeroForOne ? bal0 : bal1
-  const amountIn = safeParse(amount)
+  const amountIn = safeParse(amount, decIn)
   const insufficient = balIn !== undefined && amountIn > balIn
 
-  // Spot price (token1 per token0) and the spot rate for the chosen direction.
-  const price = priceData ? sqrtPriceToPrice(priceData.sqrtPriceX96) : 0
+  // Human price (token1 per token0), decimal-adjusted. Rate for the chosen side.
+  const price = priceData ? humanPrice(priceData.sqrtPriceX96, pool.dec0, pool.dec1) : 0
   const spotRate = price ? (zeroForOne ? price : 1 / price) : 0
-  // Current swap fee (pips, 1e6 = 100%). Dynamic-fee pools store it in slot0;
-  // fall back to the 0.30% base fee if it isn't populated.
-  const feePips =
-    priceData?.lpFee && priceData.lpFee > 0 && priceData.lpFee < 1_000_000 ? priceData.lpFee : 3000
 
-  // Exact-input quote from the pool's live sqrtPrice + active liquidity (v4 math).
+  // Live dynamic fee (pips). Prefer the hook's currentFee; fall back to slot0/base.
+  const feePips =
+    priceData?.dynFee && priceData.dynFee > 0
+      ? priceData.dynFee
+      : priceData?.lpFee && priceData.lpFee > 0 && priceData.lpFee < 1_000_000
+        ? priceData.lpFee
+        : 3000
+
   const quote = useMemo(() => {
     if (!priceData?.sqrtPriceX96 || !priceData?.liquidity || amountIn <= 0n) return null
     return quoteExactInput({
@@ -70,21 +72,19 @@ export default function SwapPanel({ onSwapped }) {
   }, [priceData?.sqrtPriceX96, priceData?.liquidity, amountIn, feePips, zeroForOne])
 
   const amountOutWei = quote?.amountOut ?? 0n
-  const estOut = amountOutWei > 0n ? Number(formatUnits(amountOutWei, 18)) : 0
+  const estOut = amountOutWei > 0n ? Number(formatUnits(amountOutWei, decOut)) : 0
 
   const slipPct = Math.max(0, Number(slippage) || 0)
   const slipValid = slippage !== '' && !isNaN(Number(slippage)) && slipPct >= 0 && slipPct <= 50
 
-  // amountOutMin sent on-chain — apply the slippage haircut to the exact quote in wei.
   const amountOutMin = useMemo(() => {
     if (amountOutWei <= 0n || !slipValid) return 0n
     const factor = BigInt(Math.round((1 - slipPct / 100) * 1_000_000))
     return (amountOutWei * factor) / 1_000_000n
   }, [amountOutWei, slipPct, slipValid])
 
-  const minOut = amountOutMin > 0n ? Number(formatUnits(amountOutMin, 18)) : 0
+  const minOut = amountOutMin > 0n ? Number(formatUnits(amountOutMin, decOut)) : 0
 
-  // Price impact = how far the execution rate sits below the (fee-adjusted) spot rate.
   const amtNum = Number(amount) || 0
   const execRate = estOut > 0 && amtNum > 0 ? estOut / amtNum : 0
   const priceImpact =
@@ -92,10 +92,6 @@ export default function SwapPanel({ onSwapped }) {
       ? Math.max(0, (1 - execRate / (spotRate * (1 - feePips / 1_000_000))) * 100)
       : 0
 
-  const rate = spotRate
-
-  // This router pulls input tokens via a direct ERC20 transferFrom, so it needs
-  // a plain ERC20 approval to the router (not the Permit2 path).
   async function ensureRouterAllowance() {
     const allowance = await publicClient.readContract({
       address: tokenIn,
@@ -111,18 +107,9 @@ export default function SwapPanel({ onSwapped }) {
   }
 
   async function swap() {
-    if (amountIn <= 0n) {
-      toast({ variant: 'error', title: 'Enter an amount' })
-      return
-    }
-    if (!slipValid) {
-      toast({ variant: 'error', title: 'Invalid slippage', desc: 'Use a percentage between 0 and 50.' })
-      return
-    }
-    if (insufficient) {
-      toast({ variant: 'error', title: `Not enough ${symIn}`, desc: 'Mint more on the Create page.' })
-      return
-    }
+    if (amountIn <= 0n) return toast({ variant: 'error', title: 'Enter an amount' })
+    if (!slipValid) return toast({ variant: 'error', title: 'Invalid slippage', desc: 'Use 0–50%.' })
+    if (insufficient) return toast({ variant: 'error', title: `Not enough ${symIn}` })
     if (!(await ensureRouterAllowance())) return
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600)
     await run(
@@ -130,7 +117,7 @@ export default function SwapPanel({ onSwapped }) {
         address: ADDR.swapRouter,
         abi: SWAP_ROUTER_ABI,
         functionName: 'swapExactTokensForTokens',
-        args: [amountIn, amountOutMin, zeroForOne, POOL_KEY, '0x', address, deadline],
+        args: [amountIn, amountOutMin, zeroForOne, pool.key, '0x', address, deadline],
       },
       {
         pendingMsg: `Swapping ${symIn} → ${symOut}…`,
@@ -151,17 +138,27 @@ export default function SwapPanel({ onSwapped }) {
           <Dot color="volt" pulse /> triggers RSC
         </Chip>
       </div>
-      <p className="mt-2 text-sm text-bone/55">
-        Swap to move the price. Each swap makes the hook emit a snapshot, and the Reactive Network recomputes every open
-        position's IL within a block or two.
-      </p>
 
-      <div className="mt-5 space-y-2">
+      <PoolSelector className="mt-4" />
+
+      {/* live dynamic fee for this pool */}
+      <div className="mt-3 flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+        <span className="font-mono text-[11px] uppercase tracking-wider text-bone/45">Live fee</span>
+        <span
+          className={`font-mono text-sm font-bold tabular-nums ${
+            feePips <= 3000 ? 'text-yield' : feePips < 12000 ? 'text-amber' : 'text-risk'
+          }`}
+        >
+          {(feePips / 10000).toFixed(3)}% <span className="text-bone/35">· dynamic</span>
+        </span>
+      </div>
+
+      <div className="mt-3 space-y-2">
         <div className="rounded-xl border-2 border-white/12 bg-ink-soft/60 p-4">
           <div className="mb-2 flex items-center justify-between">
             <span className="kicker">You pay</span>
             <span className="font-mono text-[11px] text-bone/40">
-              bal {fmtToken(balIn)} {symIn}
+              bal {fmtToken(balIn, decIn)} {symIn}
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -173,9 +170,7 @@ export default function SwapPanel({ onSwapped }) {
               className="min-w-0 flex-1 bg-transparent font-mono text-xl font-bold text-bone outline-none sm:text-2xl"
               placeholder="0.0"
             />
-            <span
-              className={`chip ${zeroForOne ? 'border-yield/60 text-yield' : 'border-risk/60 text-risk'} text-sm`}
-            >
+            <span className={`chip ${zeroForOne ? 'border-yield/60 text-yield' : 'border-risk/60 text-risk'} text-sm`}>
               {symIn}
             </span>
           </div>
@@ -194,15 +189,15 @@ export default function SwapPanel({ onSwapped }) {
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
           <div className="flex items-center justify-between">
             <span className="kicker">You receive</span>
-            {rate > 0 && (
+            {spotRate > 0 && (
               <span className="font-mono text-[11px] text-bone/40">
-                1 {symIn} ≈ {fmtNum(rate, 4)} {symOut}
+                1 {symIn} ≈ {fmtNum(spotRate, 6)} {symOut}
               </span>
             )}
           </div>
           <div className="mt-1 flex items-center justify-between">
             <span className="font-mono text-xl font-bold text-bone sm:text-2xl">
-              {estOut > 0 ? fmtNum(estOut, 4) : <span className="text-bone/40">0.0</span>}
+              {estOut > 0 ? fmtNum(estOut, 6) : <span className="text-bone/40">0.0</span>}
             </span>
             <span className={`chip ${zeroForOne ? 'border-risk/60 text-risk' : 'border-yield/60 text-yield'} text-sm`}>
               {symOut}
@@ -213,23 +208,18 @@ export default function SwapPanel({ onSwapped }) {
         {estOut > 0 && (
           <div className="flex items-center justify-between px-1 font-mono text-[11px] text-bone/40">
             <span>price impact</span>
-            <span
-              className={
-                priceImpact > 5 ? 'text-risk' : priceImpact > 1 ? 'text-amber' : 'text-bone/60'
-              }
-            >
+            <span className={priceImpact > 5 ? 'text-risk' : priceImpact > 1 ? 'text-amber' : 'text-bone/60'}>
               {priceImpact < 0.01 ? '<0.01' : priceImpact.toFixed(2)}%
             </span>
           </div>
         )}
       </div>
 
-      {/* slippage control */}
       <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.02] p-4">
         <div className="flex items-center justify-between">
           <span className="kicker">Slippage tolerance</span>
           <span className="font-mono text-[11px] text-bone/40">
-            {estOut > 0 ? `min ${fmtNum(minOut, 4)} ${symOut}` : 'set price guard'}
+            {estOut > 0 ? `min ${fmtNum(minOut, 6)} ${symOut}` : 'set price guard'}
           </span>
         </div>
         <div className="mt-2 flex items-center gap-2">
@@ -239,20 +229,14 @@ export default function SwapPanel({ onSwapped }) {
                 key={p}
                 onClick={() => setSlippage(p)}
                 className={`rounded-lg border px-2.5 py-1 font-mono text-xs transition-colors ${
-                  slippage === p
-                    ? 'border-volt/60 bg-volt/10 text-volt'
-                    : 'border-white/12 text-bone/55 hover:border-white/25'
+                  slippage === p ? 'border-volt/60 bg-volt/10 text-volt' : 'border-white/12 text-bone/55 hover:border-white/25'
                 }`}
               >
                 {p}%
               </button>
             ))}
           </div>
-          <div
-            className={`ml-auto flex items-center gap-1 rounded-lg border px-2.5 py-1 ${
-              slipValid ? 'border-white/12' : 'border-risk/60'
-            }`}
-          >
+          <div className={`ml-auto flex items-center gap-1 rounded-lg border px-2.5 py-1 ${slipValid ? 'border-white/12' : 'border-risk/60'}`}>
             <input
               type="number"
               min="0"
@@ -266,12 +250,7 @@ export default function SwapPanel({ onSwapped }) {
             <span className="font-mono text-sm text-bone/50">%</span>
           </div>
         </div>
-        {!slipValid && (
-          <p className="mt-2 font-mono text-[10px] text-risk">Enter a percentage between 0 and 50.</p>
-        )}
-        {slipValid && slipPct > 5 && (
-          <p className="mt-2 font-mono text-[10px] text-amber">High slippage — you may receive much less than estimated.</p>
-        )}
+        {!slipValid && <p className="mt-2 font-mono text-[10px] text-risk">Enter a percentage between 0 and 50.</p>}
       </div>
 
       {isConnected ? (

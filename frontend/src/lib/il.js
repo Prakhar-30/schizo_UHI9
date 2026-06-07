@@ -5,11 +5,20 @@ import { decodeAbiParameters } from 'viem'
 
 const Q96 = 2 ** 96
 
-/** sqrtPriceX96 → price of token0 denominated in token1 (assumes equal decimals). */
+/** sqrtPriceX96 → RAW price (token1 per token0, in smallest units). Decimal-agnostic. */
 export function sqrtPriceToPrice(sqrtPriceX96) {
   if (!sqrtPriceX96) return 0
   const s = Number(sqrtPriceX96) / Q96
   return s * s
+}
+
+/**
+ * sqrtPriceX96 → HUMAN price = how many whole token1 per 1 whole token0.
+ *   human = raw · 10^(dec0 - dec1)
+ * Use this for any displayed price/rate on pools with mixed decimals.
+ */
+export function humanPrice(sqrtPriceX96, dec0 = 18, dec1 = 18) {
+  return sqrtPriceToPrice(sqrtPriceX96) * 10 ** (Number(dec0) - Number(dec1))
 }
 
 /**
@@ -51,14 +60,15 @@ export function ilSeverity(bps) {
 //  have posted — mirroring ILBondReactive._computeILMark exactly.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Mirrors ILBondHook.PositionData, wrapped as `abi.encode(uint160 currentSqrt, PositionData[])`.
+// Mirrors ILBondHook.PositionData, wrapped as `abi.encode(PositionData[])`.
+// Each entry now carries its own pool's current price, so marks are multi-pool safe.
 const BUNDLE_ABI = [
-  { type: 'uint160' },
   {
     type: 'tuple[]',
     components: [
       { name: 'positionId', type: 'uint256' },
       { name: 'entrySqrtPriceX96', type: 'uint160' },
+      { name: 'currentSqrtPriceX96', type: 'uint160' },
       { name: 'sqrtPriceLower', type: 'uint160' },
       { name: 'sqrtPriceUpper', type: 'uint160' },
       { name: 'liquidity', type: 'uint128' },
@@ -68,13 +78,13 @@ const BUNDLE_ABI = [
 
 /**
  * Decode an ILBondDataBundle event's `data` bytes.
- * Returns `{ currentSqrt, positions }` or null if it can't be decoded.
+ * Returns `{ positions }` or null if it can't be decoded.
  */
 export function decodeBundle(dataHex) {
   if (!dataHex) return null
   try {
-    const [currentSqrt, positions] = decodeAbiParameters(BUNDLE_ABI, dataHex)
-    return { currentSqrt, positions }
+    const [positions] = decodeAbiParameters(BUNDLE_ABI, dataHex)
+    return { positions }
   } catch {
     return null
   }
@@ -84,6 +94,7 @@ export function decodeBundle(dataHex) {
  * Compute the IL mark for one position from a bundle, matching the on-chain RSC:
  *   ilBps     = -round((1 - 2√r/(1+r)) * 10000),  r = currentP / entryP
  *   markValue = liquidity * (BPS - |ilBps|) / BPS   (token1-equivalent estimate)
+ * Uses the position's own pool price carried in the bundle entry.
  * Returns `{ ilBps, markValue }` (BigInt markValue) or null if the position isn't
  * in the bundle / has no liquidity.
  */
@@ -91,8 +102,8 @@ export function bundleMark(dataHex, positionId) {
   const b = decodeBundle(dataHex)
   if (!b) return null
   const p = b.positions.find((x) => Number(x.positionId) === Number(positionId))
-  if (!p || !p.liquidity || !p.entrySqrtPriceX96 || !b.currentSqrt) return null
-  const ilFraction = -computeIL(p.entrySqrtPriceX96, b.currentSqrt) // non-negative magnitude
+  if (!p || !p.liquidity || !p.entrySqrtPriceX96 || !p.currentSqrtPriceX96) return null
+  const ilFraction = -computeIL(p.entrySqrtPriceX96, p.currentSqrtPriceX96) // non-negative magnitude
   const ilMag = Math.max(0, Math.round(ilFraction * 10000))
   const ilBps = -ilMag
   const markValue = (p.liquidity * BigInt(10000 - ilMag)) / 10000n
