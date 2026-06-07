@@ -4,28 +4,71 @@ import Logo from './Logo'
 import WalletButton from './WalletButton'
 
 const LINKS = [
-  { to: '/', label: 'Home', end: true },
-  { to: '/create', label: 'Create' },
-  { to: '/hunt', label: 'Hunt' },
-  { to: '/markets', label: 'Markets' },
-  { to: '/leaders', label: 'Leaders' },
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/about', label: 'About' },
+  { to: '/', label: 'Home', end: true, tip: 'The pitch in ten seconds — fees without the loss' },
+  { to: '/create', label: 'Create', tip: 'Mint an IL-bond: split your LP into a fee leg + a risk leg' },
+  { to: '/hunt', label: 'Hunt', tip: 'Browse live bonds for sale and buy the IL risk leg' },
+  { to: '/markets', label: 'Markets', tip: 'Every position, marked to market in real time' },
+  { to: '/leaders', label: 'Leaders', tip: 'Top fee earners, hunters & risk holders' },
+  { to: '/dashboard', label: 'Dashboard', tip: 'Your positions, live IL marks & P&L' },
+  { to: '/about', label: 'About', tip: 'How the hook + Reactive Network work under the hood' },
 ]
 
-function Item({ to, label, end, onClick }) {
+function Item({ to, label, end, tip, onClick }) {
+  return (
+    <div className="group relative">
+      <NavLink
+        to={to}
+        end={end}
+        onClick={onClick}
+        className={({ isActive }) =>
+          `relative block font-mono text-[13px] uppercase tracking-wider px-3 py-2 rounded-md transition-colors ${
+            isActive ? 'text-ink bg-bone' : 'text-bone/55 hover:text-bone hover:bg-white/5'
+          }`
+        }
+      >
+        {label}
+      </NavLink>
+      {tip && (
+        <div
+          className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 w-max max-w-[210px] -translate-x-1/2 translate-y-1 rounded-md border border-volt/30 bg-ink/95 px-2.5 py-1.5 text-center font-mono text-[10px] normal-case leading-snug tracking-normal text-bone/70 opacity-0 shadow-glow backdrop-blur-xl transition-all duration-150 group-hover:translate-y-0 group-hover:opacity-100"
+        >
+          <span
+            className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-l border-t border-volt/30 bg-ink/95"
+            aria-hidden
+          />
+          {tip}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MobileItem({ to, label, end, tip, onClick }) {
   return (
     <NavLink
       to={to}
       end={end}
       onClick={onClick}
       className={({ isActive }) =>
-        `relative font-mono text-[13px] uppercase tracking-wider px-3 py-2 rounded-md transition-colors ${
-          isActive ? 'text-ink bg-bone' : 'text-bone/55 hover:text-bone hover:bg-white/5'
+        `block rounded-md px-3 py-2 transition-colors ${
+          isActive ? 'bg-bone text-ink' : 'text-bone/70 hover:bg-white/5 hover:text-bone'
         }`
       }
     >
-      {label}
+      {({ isActive }) => (
+        <>
+          <span className="font-mono text-[13px] uppercase tracking-wider">{label}</span>
+          {tip && (
+            <span
+              className={`mt-0.5 block font-mono text-[10px] normal-case leading-snug tracking-normal ${
+                isActive ? 'text-ink/55' : 'text-bone/40'
+              }`}
+            >
+              {tip}
+            </span>
+          )}
+        </>
+      )}
     </NavLink>
   )
 }
@@ -64,7 +107,7 @@ export default function Navbar() {
         {open && (
           <nav className="flex flex-col gap-1 border-t border-white/10 bg-ink/95 px-4 py-3 backdrop-blur-xl lg:hidden">
             {LINKS.map((l) => (
-              <Item key={l.to} {...l} onClick={() => setOpen(false)} />
+              <MobileItem key={l.to} {...l} onClick={() => setOpen(false)} />
             ))}
           </nav>
         )}

@@ -7,6 +7,7 @@ import { sqrtPriceToPrice } from '../lib/il'
 // red = price down (net selling).
 const UP = '#26d07c'
 const DOWN = '#ff3b6b'
+const LIVE = '#2ef8d8' // mint — the forming/live candle, awaiting the next swap
 const MAX_CANDLES = 32
 
 /**
@@ -133,7 +134,16 @@ function CandleChart({ data, entryPrice }) {
     <div className="card p-5">
       <div className="flex items-baseline justify-between gap-2">
         <div>
-          <Kicker>Pool price</Kicker>
+          <div className="flex items-center gap-2">
+            <Kicker>Pool price</Kicker>
+            <span className="flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider text-mint">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-mint" />
+              </span>
+              live
+            </span>
+          </div>
           <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-bone/30">
             {data.length} swaps · {candles.length} candles{step < 9 ? ' (grouped)' : ''}
           </p>
@@ -226,6 +236,7 @@ function CandleChart({ data, entryPrice }) {
             const top = Math.min(yO, yC)
             const bh = Math.max(Math.abs(yO - yC), 1.2)
             const isHover = hover === i
+            const isLast = i === candles.length - 1
             return (
               <g key={i} opacity={hover != null && !isHover ? 0.55 : 1}>
                 {/* wick */}
@@ -247,6 +258,29 @@ function CandleChart({ data, entryPrice }) {
                   fill={color}
                   rx="0.5"
                 />
+                {/* live pulse on the most-recent candle — breathes green until a
+                    new swap arrives, at which point the data refetches (12s poll)
+                    and the pulse re-attaches to the new last candle on its own. */}
+                {isLast && (
+                  <g>
+                    <line
+                      x1={x}
+                      x2={x}
+                      y1={sy(c.high)}
+                      y2={sy(c.low)}
+                      stroke={LIVE}
+                      strokeWidth="1.4"
+                      vectorEffect="non-scaling-stroke"
+                    >
+                      <animate attributeName="opacity" values="0;0.9;0" dur="1.6s" repeatCount="indefinite" />
+                    </line>
+                    <circle cx={x} cy={sy(c.close)} r="3" fill={LIVE}>
+                      <animate attributeName="r" values="3;7;3" dur="1.6s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0.9;0;0.9" dur="1.6s" repeatCount="indefinite" />
+                    </circle>
+                    <circle cx={x} cy={sy(c.close)} r="2.2" fill={LIVE} />
+                  </g>
+                )}
                 {/* hover hit-area */}
                 <rect
                   x={x - step / 2}
