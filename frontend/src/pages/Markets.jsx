@@ -20,7 +20,7 @@ export default function Markets() {
   )
   const activeSold = positions.filter((p) => p.active && p.ilBondSold)
   const avgIL = activeSold.length
-    ? activeSold.reduce((s, p) => s + Number(p.ilMarkBps), 0) / activeSold.length
+    ? activeSold.reduce((s, p) => s + Number(p.liveIlBps ?? p.ilMarkBps), 0) / activeSold.length
     : 0
 
   const reactBal = rsc.balance !== undefined ? (Number(rsc.balance) / 1e18).toFixed(3) : '—'

@@ -211,35 +211,31 @@ export function usePoolStats() {
   return { byId, isLoading: r.isLoading, refetch: r.refetch }
 }
 
-// ── per-pool SwapOccurred price series (on-chain, new hook, recent window) ───
-// Reads directly from the live hook (bypasses Supabase, which indexes the old
-// hook) so per-pool price charts reflect the current deployment immediately.
+// ── per-pool SwapOccurred price series, grouped by poolId ────────────────────
+// Backend-first: sourced from useAllEvents (Supabase → on-chain fallback), so
+// the Pools trend charts use the same prioritized source as everything else.
 export function usePoolSwapSeries() {
-  return useQuery({
-    queryKey: ['poolSwapSeries', ADDR.hook],
-    refetchInterval: REFRESH,
-    queryFn: async () => {
-      const latest = await logClient.getBlockNumber()
-      const from = latest > LOG_LOOKBACK ? latest - LOG_LOOKBACK : 0n
-      const raw = await logClient.getLogs({ address: ADDR.hook, fromBlock: from, toBlock: 'latest' })
-      const decoded = parseEventLogs({ abi: HOOK_ABI, logs: raw })
-      const byPool = {}
-      for (const l of decoded) {
-        if (l.eventName !== 'SwapOccurred') continue
-        const pid = String(l.args.poolId).toLowerCase()
-        ;(byPool[pid] ||= []).push({
-          block: Number(l.blockNumber),
-          idx: Number(l.logIndex),
-          sqrtPriceX96: l.args.sqrtPriceX96,
-          tick: Number(l.args.tick),
-        })
-      }
-      for (const k in byPool) {
-        byPool[k].sort((a, b) => (a.block === b.block ? a.idx - b.idx : a.block - b.block))
-      }
-      return byPool
-    },
-  })
+  const r = useAllEvents()
+  const byPool = useMemo(() => {
+    const m = {}
+    if (!r.data) return m
+    for (const e of r.data) {
+      if (e.name !== 'SwapOccurred' || !e.args?.poolId) continue
+      const pid = String(e.args.poolId).toLowerCase()
+      ;(m[pid] ||= []).push({
+        block: Number(e.blockNumber),
+        idx: Number(e.logIndex),
+        sqrtPriceX96: e.args.sqrtPriceX96,
+        tick: Number(e.args.tick),
+        ts: e.ts,
+      })
+    }
+    for (const k in m) {
+      m[k].sort((a, b) => (a.block === b.block ? a.idx - b.idx : a.block - b.block))
+    }
+    return m
+  }, [r.data])
+  return { data: byPool, isLoading: r.isLoading, refetch: r.refetch }
 }
 
 // ── on-chain fallback: events within the ~9500-block (~32h) public-RPC window ─
@@ -281,7 +277,10 @@ export function useAllEvents() {
         try {
           const events = await fetchEventsFromSupabase()
           nudgeIndexer()
-          return events
+          // Use Supabase when it actually has data. If it's reachable but empty
+          // (e.g. the new-hook backfill hasn't run yet), fall through to on-chain
+          // so charts / IL / activity aren't blank.
+          if (events.length > 0) return events
         } catch (err) {
           console.warn('[schizo] Supabase event read failed, falling back to chain:', err)
         }
