@@ -5,6 +5,7 @@ import Create from './pages/Create'
 import Hunt from './pages/Hunt'
 import Markets from './pages/Markets'
 import Pools from './pages/Pools'
+import Pulse from './pages/Pulse'
 import Dashboard from './pages/Dashboard'
 import About from './pages/About'
 import Leaderboard from './pages/Leaderboard'
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="/hunt" element={<Hunt />} />
         <Route path="/pools" element={<Pools />} />
         <Route path="/markets" element={<Markets />} />
+        <Route path="/pulse" element={<Pulse />} />
         <Route path="/leaders" element={<Leaderboard />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/positions/:id" element={<PositionDetail />} />

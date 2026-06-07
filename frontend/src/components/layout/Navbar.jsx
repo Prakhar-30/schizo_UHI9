@@ -9,6 +9,7 @@ const LINKS = [
   { to: '/hunt', label: 'Hunt', tip: 'Browse live bonds for sale and buy the IL risk leg' },
   { to: '/pools', label: 'Pools', tip: 'All dynamic-fee pools — live price, trend & fee' },
   { to: '/markets', label: 'Markets', tip: 'Every position, marked to market in real time' },
+  { to: '/pulse', label: 'Pulse', tip: 'Live platform activity across all pools' },
   { to: '/leaders', label: 'Leaders', tip: 'Top fee earners, hunters & risk holders' },
   { to: '/dashboard', label: 'Dashboard', tip: 'Your positions, live IL marks & P&L' },
   { to: '/about', label: 'About', tip: 'How the hook + Reactive Network work under the hood' },

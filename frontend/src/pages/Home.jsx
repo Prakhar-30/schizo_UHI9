@@ -5,6 +5,7 @@ import { Card } from '../components/ui/Card'
 import { Kicker, Chip, Dot } from '../components/ui/Bits'
 import Marquee from '../components/layout/Marquee'
 import SplitDiagram from '../components/SplitDiagram'
+import SwapPanel from '../components/SwapPanel'
 
 function HeroStat({ label, value, accent }) {
   return (
@@ -58,37 +59,25 @@ export default function Home() {
             </div>
           </div>
 
-          {/* hero panel */}
+          {/* hero panel → live swap interface (drives the oracle) */}
           <div className="relative">
             <div className="absolute -inset-4 rounded-[2rem] bg-gradient-to-br from-volt/20 via-transparent to-risk/20 blur-2xl" />
-            <Card glow="volt" className="relative overflow-hidden p-5 sm:p-7">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <Kicker>Live on Sepolia + Lasna</Kicker>
-                <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-bone/50 sm:text-[11px]">
-                  <Dot color={rsc.online ? 'mint' : 'amber'} pulse={rsc.online} />
-                  {rsc.online ? 'RSC online' : 'RSC syncing'}
-                </span>
-              </div>
-
-              <div className="mt-6 grid grid-cols-2 divide-x divide-y divide-white/10 overflow-hidden rounded-xl border border-white/10 [&>*]:bg-white/[0.02]">
-                <HeroStat label="Positions minted" value={nextId !== undefined ? nextId.toString() : '—'} accent="text-bone" />
-                <HeroStat label="Active bonds" value={activeCount !== undefined ? activeCount.toString() : '—'} accent="text-yield" />
-                <HeroStat label="RSC data bundles" value={bundles !== undefined ? bundles.toString() : '—'} accent="text-volt" />
-                <HeroStat
-                  label="RSC fuel"
-                  value={rsc.balance !== undefined ? `${Number(rsc.balance) / 1e18 < 0.001 ? '0' : (Number(rsc.balance) / 1e18).toFixed(2)}` : '—'}
-                  accent="text-mint"
-                />
-              </div>
-
-              <div className="mt-6 rounded-xl border border-white/10 bg-ink-soft/60 p-4">
-                <p className="font-mono text-[11px] leading-relaxed text-bone/50">
-                  <span className="text-mint">{'// '}</span>on every swap, the RSC recomputes
-                  <span className="text-bone"> IL = 1 − 2√r/(1+r)</span> and posts the mark back on-chain. No keeper. No cron.
-                </p>
-              </div>
-            </Card>
+            <div className="relative">
+              <SwapPanel />
+            </div>
           </div>
+        </div>
+
+        {/* compact live stats strip */}
+        <div className="mt-8 grid grid-cols-2 divide-x divide-y divide-white/10 overflow-hidden rounded-xl border border-white/10 sm:mt-10 sm:grid-cols-4 sm:divide-y-0 [&>*]:bg-white/[0.02]">
+          <HeroStat label="Positions minted" value={nextId !== undefined ? nextId.toString() : '—'} accent="text-bone" />
+          <HeroStat label="Active bonds" value={activeCount !== undefined ? activeCount.toString() : '—'} accent="text-yield" />
+          <HeroStat label="RSC data bundles" value={bundles !== undefined ? bundles.toString() : '—'} accent="text-volt" />
+          <HeroStat
+            label={rsc.online ? 'RSC fuel (online)' : 'RSC fuel'}
+            value={rsc.balance !== undefined ? `${Number(rsc.balance) / 1e18 < 0.001 ? '0' : (Number(rsc.balance) / 1e18).toFixed(2)}` : '—'}
+            accent="text-mint"
+          />
         </div>
       </section>
 

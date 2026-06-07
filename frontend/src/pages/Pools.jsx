@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { POOLS } from '../config/pools'
+import { usePool } from '../context/PoolContext'
 import { usePoolStats, usePoolSwapSeries } from '../hooks/reads'
 import { humanPrice } from '../lib/il'
 import { fmtNum, fmtCompact } from '../lib/format'
@@ -15,18 +17,28 @@ const SORTS = [
   { key: 'name', label: 'Name' },
 ]
 
-function feeColor(pips) {
-  if (pips === undefined) return 'text-bone/40'
-  if (pips <= 3000) return 'text-yield'
-  if (pips < 12000) return 'text-amber'
-  return 'text-risk'
+// Continuous green→red as the live fee climbs above the 0.30% base toward the 3% cap.
+function feeStyle(pips) {
+  if (pips === undefined) return { color: 'rgba(243,239,228,0.4)' }
+  const t = Math.max(0, Math.min(1, (pips - 3000) / (30000 - 3000)))
+  const r = Math.round(198 + (255 - 198) * t)
+  const g = Math.round(255 + (46 - 255) * t)
+  const b = Math.round(46 + (109 - 46) * t)
+  return { color: `rgb(${r},${g},${b})` }
 }
 
 export default function Pools() {
+  const navigate = useNavigate()
+  const { setPoolId } = usePool()
   const { byId, isLoading } = usePoolStats()
   const { data: series } = usePoolSwapSeries()
   const [q, setQ] = useState('')
   const [sort, setSort] = useState('liq-desc')
+
+  const openPool = (id) => {
+    setPoolId(id)
+    navigate('/create')
+  }
 
   const rows = useMemo(() => {
     const list = POOLS.map((p) => {
@@ -114,7 +126,12 @@ export default function Pools() {
       ) : (
         <div className="mt-2 space-y-2">
           {rows.map((r) => (
-            <Card key={r.id} className="p-4">
+            <Card
+              key={r.id}
+              onClick={() => openPool(r.id)}
+              className="cursor-pointer p-4 transition-colors hover:border-volt/40"
+              title={`Provide IL-bonded liquidity on ${r.label}`}
+            >
               <div className="grid grid-cols-2 items-center gap-4 lg:grid-cols-[1.4fr_1fr_0.9fr_0.9fr_1.1fr]">
                 {/* pair */}
                 <div className="flex items-center gap-2">
@@ -141,8 +158,8 @@ export default function Pools() {
                   <PoolTrend prices={r.prices} />
                 </div>
 
-                {/* fee */}
-                <div className={`text-right font-mono text-sm font-bold tabular-nums ${feeColor(r.dynFee)}`}>
+                {/* fee — color reddens as it rises above 0.30% */}
+                <div className="text-right font-mono text-sm font-bold tabular-nums" style={feeStyle(r.dynFee)}>
                   {r.dynFee !== undefined ? `${(r.dynFee / 10000).toFixed(3)}%` : '—'}
                 </div>
 

@@ -138,6 +138,16 @@ export default function Create() {
         </p>
       </div>
 
+      {/* steer hunters to the other side of the market */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-risk/30 bg-risk/[0.06] px-4 py-3">
+        <p className="font-mono text-sm text-bone/70">
+          <span className="text-risk">Looking to hunt?</span> If you'd rather <b className="text-bone">buy</b> impermanent-loss risk for a premium instead of minting, the open bonds live on the Hunt page.
+        </p>
+        <Button to="/hunt" variant="risk" size="sm">
+          I'm a hunter →
+        </Button>
+      </div>
+
       {wrongChain && (
         <div className="mb-6 flex items-center gap-3 rounded-xl border-2 border-amber/40 bg-amber/5 p-4">
           <Dot color="amber" pulse />

@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { Kicker } from './ui/Bits'
 import { fmtBpsPct, fmtNum, timeAgo } from '../lib/format'
-import { sqrtPriceToPrice } from '../lib/il'
+import { humanPrice } from '../lib/il'
 
 // Trading-style colours: green = price up over the candle (net buying),
 // red = price down (net selling).
@@ -18,14 +18,14 @@ const MAX_CANDLES = 32
  *     price in its bucket, with wicks from the bucket's high/low.
  *  2. Impermanent-loss mark over time (line, magenta / risk).
  */
-export default function PositionChart({ ilMarks, swaps, entryPrice }) {
+export default function PositionChart({ ilMarks, swaps, entryPrice, dec0 = 18, dec1 = 18 }) {
   const priceSeries = useMemo(
     () =>
       swaps.map((s) => ({
         ts: s.ts,
-        price: sqrtPriceToPrice(s.args.sqrtPriceX96),
+        price: humanPrice(s.args.sqrtPriceX96, dec0, dec1),
       })),
-    [swaps],
+    [swaps, dec0, dec1],
   )
 
   const ilSeries = useMemo(

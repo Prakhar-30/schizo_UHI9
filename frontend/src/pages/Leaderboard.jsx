@@ -99,10 +99,10 @@ export default function Leaderboard() {
           sub="all-time"
         />
         <Stat
-          label="Premium volume"
-          value={`${fmtToken(data.totals.totalPremium)} BETA`}
+          label="Bonds sold (premium)"
+          value={data.totals.bondsSold.toString()}
           accent="yield"
-          sub="paid to FEE-T holders"
+          sub="premiums paid across tokens"
         />
         <Stat
           label="Active bonds"
@@ -120,7 +120,7 @@ export default function Leaderboard() {
           accent="yield"
           rows={data.lpEarnings}
           formatValue={(v) => fmtToken(v)}
-          valueLabel="BETA"
+          valueLabel="prem"
           emptyLabel="No bond sales yet."
         />
         <Board
@@ -129,7 +129,7 @@ export default function Leaderboard() {
           accent="risk"
           rows={data.hunterSpend}
           formatValue={(v) => fmtToken(v)}
-          valueLabel="BETA"
+          valueLabel="prem"
           emptyLabel="No buyers yet."
         />
         <Board

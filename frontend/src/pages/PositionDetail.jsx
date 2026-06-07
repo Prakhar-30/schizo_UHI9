@@ -8,7 +8,7 @@ import {
   usePositionHistory,
   useHookCounters,
 } from '../hooks/reads'
-import { sqrtPriceToPrice, humanPrice } from '../lib/il'
+import { humanPrice } from '../lib/il'
 import { fmtToken, fmtNum, fmtBpsPct, isSameAddr } from '../lib/format'
 import { ADDR, HOOK_ABI, ERC20_ABI, SEPOLIA_CHAIN_ID, sepoliaAddr, sepoliaTx } from '../config/contracts'
 import { useTx } from '../hooks/useTx'
@@ -100,9 +100,6 @@ export default function PositionDetail() {
   const premiumToken = position.premiumToken || ADDR.token1
   const pairLabel = position.pool?.label || 'pair'
 
-  // Raw price for the candle chart (consistent with its raw swap prices);
-  // human price for the headline stats.
-  const chartEntryRaw = sqrtPriceToPrice(entrySqrtPriceX96)
   const entryPrice = humanPrice(entrySqrtPriceX96, dec0, dec1)
   const currentPrice = position.currentSqrtPriceX96 ? humanPrice(position.currentSqrtPriceX96, dec0, dec1) : 0
   const priceMovePct = entryPrice && currentPrice ? ((currentPrice / entryPrice) - 1) * 100 : 0
@@ -228,7 +225,9 @@ export default function PositionDetail() {
           <PositionChart
             ilMarks={history.ilMarks}
             swaps={history.swaps}
-            entryPrice={chartEntryRaw}
+            entryPrice={entryPrice}
+            dec0={dec0}
+            dec1={dec1}
           />
 
           {/* gauge */}
