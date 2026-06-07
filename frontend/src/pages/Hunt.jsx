@@ -5,7 +5,7 @@ import { maxUint256 } from 'viem'
 import { usePositions, useHookCounters, useReactiveStatus } from '../hooks/reads'
 import { POOLS } from '../config/pools'
 import OutcomeStrip from '../components/OutcomeStrip'
-import { fmtToken, isSameAddr } from '../lib/format'
+import { fmtToken, fmtCompact, isSameAddr } from '../lib/format'
 import { ADDR, HOOK_ABI, ERC20_ABI, SEPOLIA_CHAIN_ID, sepoliaAddr } from '../config/contracts'
 import { useTx } from '../hooks/useTx'
 import { Card } from '../components/ui/Card'
@@ -57,7 +57,7 @@ function HuntRow({ position, marked, busyId, onBuy }) {
           </div>
           <div className="min-w-0">
             <p className="kicker truncate">Liquidity</p>
-            <p className="mt-0.5 truncate font-mono text-sm font-bold tabular-nums">{fmtToken(liquidity)}</p>
+            <p className="mt-0.5 truncate font-mono text-sm font-bold tabular-nums">{fmtCompact(liquidity)}</p>
           </div>
           <div className="col-span-2 min-w-0 sm:col-span-1">
             <p className="kicker">Listed by</p>

@@ -93,66 +93,29 @@ export default function Dashboard() {
         <Stat label="Token claims" value={claims.length.toString()} accent="mint" sub="tokens to withdraw" />
       </div>
 
-      {/* withdrawable + share side-by-side on lg+, stacked on smaller */}
-      <div
-        className={`mt-6 grid gap-6 ${
-          shareable.length > 0 && sharePosition ? 'lg:grid-cols-[1.35fr_1fr]' : ''
-        }`}
-      >
-        {/* claimable — one row per token owed */}
-        <Card className="p-5 sm:p-6">
-          <Kicker>Claimable from the hook</Kicker>
-          {nothing ? (
-            <div className="mt-3 flex items-center gap-2">
-              <Chip color="white">nothing to claim</Chip>
-              <span className="font-mono text-[11px] text-bone/35">proceeds appear here after a position exits</span>
-            </div>
-          ) : (
-            <div className="mt-3 space-y-2">
-              {claims.map((c) => (
-                <div key={c.token} className="flex items-center justify-between gap-3 rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2.5">
-                  <span className="font-mono text-base font-bold tabular-nums text-yield">
-                    {fmtToken(c.amount, c.dec)} {c.sym}
-                  </span>
-                  <Button variant="bone" size="sm" loading={pending} onClick={() => withdraw(c.token, c.sym)}>
-                    Claim {c.sym}
-                  </Button>
-                </div>
-              ))}
-              <p className="pt-1 font-mono text-[11px] text-bone/40">
-                claims are paid per token — each button sends exactly that token's balance to your wallet.
-              </p>
-            </div>
-          )}
-        </Card>
-
-        {/* share panel (paired right next to withdrawable on lg+) */}
-        {shareable.length > 0 && sharePosition && (
-          <Card className="p-5 sm:p-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <Kicker>Cast your bonds</Kicker>
-              <div className="flex flex-wrap items-center gap-2">
-                {shareable.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => setShareId(p.id)}
-                    className={`rounded-md border-2 px-2.5 py-1 font-mono text-xs font-bold transition-colors ${
-                      p.id === shareId
-                        ? 'border-volt bg-volt/10 text-volt'
-                        : 'border-white/15 text-bone/60 hover:border-white/35 hover:text-bone'
-                    }`}
-                  >
-                    #{p.id}
-                  </button>
-                ))}
+      {/* claimable — one row per token owed (full width) */}
+      <Card className="mt-6 p-5 sm:p-6">
+        <Kicker>Claimable from the hook</Kicker>
+        {nothing ? (
+          <div className="mt-3 flex items-center gap-2">
+            <Chip color="white">nothing to claim</Chip>
+            <span className="font-mono text-[11px] text-bone/35">proceeds appear here after a position exits</span>
+          </div>
+        ) : (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {claims.map((c) => (
+              <div key={c.token} className="flex items-center justify-between gap-3 rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2.5">
+                <span className="font-mono text-base font-bold tabular-nums text-yield">
+                  {fmtToken(c.amount, c.dec)} {c.sym}
+                </span>
+                <Button variant="bone" size="sm" loading={pending} onClick={() => withdraw(c.token, c.sym)}>
+                  Claim {c.sym}
+                </Button>
               </div>
-            </div>
-            <div className="mt-4">
-              <SharePanel positionId={sharePosition.id} position={sharePosition} embedded />
-            </div>
-          </Card>
+            ))}
+          </div>
         )}
-      </div>
+      </Card>
 
       {/* my positions */}
       <div className="mt-10">
@@ -184,13 +147,43 @@ export default function Dashboard() {
                     {isSameAddr(address, p.feeHolder) && <Leg kind="fee" />}
                     {isSameAddr(address, p.ilHolder) && <Leg kind="il" />}
                   </div>
-                  <PositionCard position={p} marked={bundles > 0n} onAction={() => { refetchPositions(); refetchWithdrawable(); }} />
+                  <PositionCard position={p} marked={bundles > 0n} onAction={() => { refetchPositions(); refetchClaims(); }} />
                 </div>
               ))}
           </div>
         )}
       </div>
 
+      {/* cast your bonds — share (secondary, bottom) */}
+      {shareable.length > 0 && sharePosition && (
+        <div className="mt-12">
+          <SectionHead
+            kicker="Share"
+            title="Cast your bonds"
+            sub="Post a position to X with a live preview image."
+            right={
+              <div className="flex flex-wrap items-center gap-1.5">
+                {shareable.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setShareId(p.id)}
+                    className={`rounded-md border-2 px-2.5 py-1 font-mono text-xs font-bold transition-colors ${
+                      p.id === shareId
+                        ? 'border-volt bg-volt/10 text-volt'
+                        : 'border-white/15 text-bone/60 hover:border-white/35 hover:text-bone'
+                    }`}
+                  >
+                    #{p.id}
+                  </button>
+                ))}
+              </div>
+            }
+          />
+          <Card className="mt-6 p-5 sm:p-6 lg:max-w-2xl">
+            <SharePanel positionId={sharePosition.id} position={sharePosition} embedded />
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

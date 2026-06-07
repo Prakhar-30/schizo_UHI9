@@ -7,6 +7,7 @@ import Stat from '../components/ui/Stat'
 import { Card } from '../components/ui/Card'
 import { Kicker, Dot, SectionHead, Spinner } from '../components/ui/Bits'
 import PositionCard from '../components/PositionCard'
+import Faucet from '../components/Faucet'
 
 export default function Markets() {
   const { positions, isLoading, refetch: refetchPositions } = usePositions()
@@ -64,6 +65,11 @@ export default function Markets() {
           accent="risk"
           sub={`${activeSold.length} sold bonds`}
         />
+      </div>
+
+      {/* test-token faucet (scoped to the chosen pool) */}
+      <div className="mt-10 lg:max-w-md">
+        <Faucet showSelector banner />
       </div>
 
       {/* positions (full width — data only) */}

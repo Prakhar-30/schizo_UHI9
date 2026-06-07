@@ -6,7 +6,7 @@ import SplitDiagram from '../components/SplitDiagram'
 
 const STEPS = [
   { t: 'Connect & switch to Sepolia', d: 'Connect any EVM wallet. The app runs on Ethereum Sepolia; transactions prompt a network switch if needed.', tag: 'setup' },
-  { t: 'Mint test tokens', d: 'On the Create page, hit the faucet to mint ALPHA and BETA — the two assets in the demo pool. Free, unlimited, testnet only.', tag: 'faucet' },
+  { t: 'Mint test tokens', d: "On the Markets page, hit the faucet to mint the test tokens for any pool. Free, testnet only — these aren't real assets.", tag: 'faucet' },
   { t: 'Mint a bond', d: 'Choose a liquidity size and an ask premium, then approve & deposit. You mint one position and hold both legs: FEE-T and IL-T.', tag: 'create' },
   { t: 'Sell the risk', d: 'List sits on Markets automatically. A buyer pays your premium and takes IL-T. You keep FEE-T — yield with no price risk.', tag: 'trade' },
   { t: 'Move the price', d: 'Use the swap panel on Markets. Each swap makes the hook emit a price snapshot the Reactive Network listens for.', tag: 'swap' },

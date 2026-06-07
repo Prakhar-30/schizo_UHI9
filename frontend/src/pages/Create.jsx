@@ -35,27 +35,6 @@ function safeParse(v, decimals) {
   }
 }
 
-function BalanceLine({ sym, color, value, decimals, mintable, onMint, minting }) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-2.5">
-      <div className="flex items-center gap-2">
-        <span className={`h-2 w-2 rounded-full ${color}`} />
-        <span className="font-mono text-sm font-bold">{sym}</span>
-      </div>
-      <div className="flex items-center gap-3">
-        <span className="font-mono text-sm tabular-nums text-bone/70">{fmtToken(value, decimals)}</span>
-        {mintable ? (
-          <Button size="sm" variant="ghost" loading={minting} onClick={onMint}>
-            +1,000
-          </Button>
-        ) : (
-          <span className="font-mono text-[10px] uppercase tracking-wider text-bone/30">external faucet</span>
-        )}
-      </div>
-    </div>
-  )
-}
-
 export default function Create() {
   const { pool } = usePool()
   const { address, isConnected, chainId } = useAccount()
@@ -64,7 +43,6 @@ export default function Create() {
   const { toast } = useToast()
   const { bal0, bal1, refetch: refetchTokens } = useTokenInfo(address, pool.token0, pool.token1)
   const { data: price } = useCurrentPrice(pool.id)
-  const [mintingToken, setMintingToken] = useState(null)
 
   const [liq, setLiq] = useState('10')
   const [premium, setPremium] = useState('0.1')
@@ -86,15 +64,6 @@ export default function Create() {
   const wrongChain = isConnected && chainId !== SEPOLIA_CHAIN_ID
   const valid = L > 0n && ask > 0n
   const dynFeePct = price?.dynFee ? (price.dynFee / 10000).toFixed(3) : (BASE_FEE_BPS / 100).toFixed(3)
-
-  async function mint(token, sym, decimals) {
-    setMintingToken(sym)
-    await run(
-      { address: token, abi: ERC20_ABI, functionName: 'mint', args: [address, parseUnits('1000', decimals)] },
-      { pendingMsg: `Minting ${sym}…`, successMsg: `+1,000 ${sym} minted`, onSuccess: refetchTokens },
-    )
-    setMintingToken(null)
-  }
 
   async function ensureAllowance(token, needed, sym) {
     const a = await publicClient.readContract({
@@ -228,21 +197,36 @@ export default function Create() {
 
         <div className="space-y-6">
           <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <Kicker>Faucet · your balances</Kicker>
-              <Chip color="mint">{tok0.mintable || tok1.mintable ? 'free' : 'real tokens'}</Chip>
+            <div className="flex items-center justify-between gap-2">
+              <Kicker>Your balances</Kicker>
+              <Button to="/markets" variant="ghost" size="sm">Get test tokens ↗</Button>
             </div>
             <div className="mt-3">
               {isConnected ? (
                 <>
-                  <BalanceLine sym={tok0.symbol} color="bg-yield" value={bal0} decimals={pool.dec0} mintable={tok0.mintable} minting={mintingToken === tok0.symbol} onMint={() => mint(pool.token0, tok0.symbol, pool.dec0)} />
+                  <div className="flex items-center justify-between py-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-yield" />
+                      <span className="font-mono text-sm font-bold">{tok0.symbol}</span>
+                    </div>
+                    <span className="font-mono text-sm tabular-nums text-bone/70">{fmtToken(bal0, pool.dec0)}</span>
+                  </div>
                   <Divider />
-                  <BalanceLine sym={tok1.symbol} color="bg-risk" value={bal1} decimals={pool.dec1} mintable={tok1.mintable} minting={mintingToken === tok1.symbol} onMint={() => mint(pool.token1, tok1.symbol, pool.dec1)} />
+                  <div className="flex items-center justify-between py-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-risk" />
+                      <span className="font-mono text-sm font-bold">{tok1.symbol}</span>
+                    </div>
+                    <span className="font-mono text-sm tabular-nums text-bone/70">{fmtToken(bal1, pool.dec1)}</span>
+                  </div>
                 </>
               ) : (
                 <p className="py-4 text-center font-mono text-sm text-bone/30">connect to see balances</p>
               )}
             </div>
+            <p className="mt-3 font-mono text-[11px] text-bone/40">
+              Low on {tok0.symbol}/{tok1.symbol}? Mint test tokens from the faucet on the Markets page.
+            </p>
           </Card>
 
           <Card className="p-6">

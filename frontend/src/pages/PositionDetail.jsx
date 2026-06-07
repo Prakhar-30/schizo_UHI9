@@ -9,7 +9,7 @@ import {
   useHookCounters,
 } from '../hooks/reads'
 import { humanPrice } from '../lib/il'
-import { fmtToken, fmtNum, fmtBpsPct, isSameAddr } from '../lib/format'
+import { fmtToken, fmtCompact, fmtNum, fmtBpsPct, isSameAddr } from '../lib/format'
 import { ADDR, HOOK_ABI, ERC20_ABI, SEPOLIA_CHAIN_ID, sepoliaAddr, sepoliaTx } from '../config/contracts'
 import { useTx } from '../hooks/useTx'
 import { useToast } from '../components/ui/Toast'
@@ -205,7 +205,7 @@ export default function PositionDetail() {
         />
         <Stat
           label="Liquidity"
-          value={fmtToken(liquidity)}
+          value={fmtCompact(liquidity)}
           accent="bone"
         />
         <Stat

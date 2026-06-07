@@ -5,9 +5,9 @@ import WalletButton from './WalletButton'
 
 const LINKS = [
   { to: '/', label: 'Home', end: true, tip: 'The pitch in ten seconds — fees without the loss' },
+  { to: '/pools', label: 'Pools', tip: 'All dynamic-fee pools — live price, trend & fee' },
   { to: '/create', label: 'Create', tip: 'Mint an IL-bond: split your LP into a fee leg + a risk leg' },
   { to: '/hunt', label: 'Hunt', tip: 'Browse live bonds for sale and buy the IL risk leg' },
-  { to: '/pools', label: 'Pools', tip: 'All dynamic-fee pools — live price, trend & fee' },
   { to: '/markets', label: 'Markets', tip: 'Every position, marked to market in real time' },
   { to: '/pulse', label: 'Pulse', tip: 'Live platform activity across all pools' },
   { to: '/leaders', label: 'Leaders', tip: 'Top fee earners, hunters & risk holders' },

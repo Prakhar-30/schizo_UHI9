@@ -5,7 +5,7 @@ import { maxUint256, isAddress } from 'viem'
 import { ADDR, HOOK_ABI, ERC20_ABI, SEPOLIA_CHAIN_ID, sepoliaAddr } from '../config/contracts'
 import { useTx } from '../hooks/useTx'
 import { useToast } from './ui/Toast'
-import { fmtToken } from '../lib/format'
+import { fmtToken, fmtCompact } from '../lib/format'
 import { isSameAddr } from '../lib/format'
 import { Card } from './ui/Card'
 import { Chip, Leg, Addr, Divider } from './ui/Bits'
@@ -118,7 +118,7 @@ export default function PositionCard({ position, marked = true, onAction }) {
       <div className="mt-4 grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
           <p className="kicker">{position.pool?.label || 'Liquidity'}</p>
-          <p className="mt-1 font-mono text-sm font-bold tabular-nums">{fmtToken(liquidity)}</p>
+          <p className="mt-1 font-mono text-sm font-bold tabular-nums">{fmtCompact(liquidity)}</p>
         </div>
         <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
           <p className="kicker">Premium</p>
