@@ -44,9 +44,20 @@ export default function Pools() {
     const list = POOLS.map((p) => {
       const stat = byId[p.id.toLowerCase()]
       const swaps = series?.[p.id.toLowerCase()] || []
-      const prices = swaps.map((s) => humanPrice(s.sqrtPriceX96, p.dec0, p.dec1))
+      const swapPrices = swaps
+        .map((s) => humanPrice(s.sqrtPriceX96, p.dec0, p.dec1))
+        .filter((v) => Number.isFinite(v) && v > 0)
       const price = stat ? humanPrice(stat.sqrtPriceX96, p.dec0, p.dec1) : 0
-      const change = prices.length >= 2 ? (prices[prices.length - 1] / prices[0] - 1) * 100 : 0
+      // Anchor every sparkline at the pool's 1:1 launch baseline (by deploy design
+      // each pool initialized at human price ≈ 1.0), then plot each observed swap,
+      // ending at the live price. This way a thin pool with a single swap still
+      // shows its real move since launch instead of a single flat point; only the
+      // genuinely untraded pools stay flat. Collapse consecutive duplicates so
+      // flat runs don't waste sparkline width.
+      const LAUNCH = 1
+      const raw = [LAUNCH, ...swapPrices, ...(price > 0 ? [price] : [])]
+      const prices = raw.filter((v, i) => i === 0 || v !== raw[i - 1])
+      const change = price > 0 ? (price / LAUNCH - 1) * 100 : 0
       return {
         ...p,
         price,
@@ -146,16 +157,17 @@ export default function Pools() {
                   </div>
                   <div
                     className={`font-mono text-[11px] tabular-nums ${
-                      r.change >= 0 ? 'text-[#26d07c]' : 'text-[#ff3b6b]'
+                      r.swapCount === 0 ? 'text-bone/30' : r.change >= 0 ? 'text-[#26d07c]' : 'text-[#ff3b6b]'
                     }`}
+                    title={r.swapCount === 0 ? 'no swaps yet' : `${r.swapCount} swap${r.swapCount === 1 ? '' : 's'} · since 1:1 launch`}
                   >
-                    {r.swapCount >= 2 ? `${r.change >= 0 ? '+' : ''}${r.change.toFixed(2)}%` : '·'}
+                    {r.swapCount === 0 ? 'no trades' : `${r.change >= 0 ? '+' : ''}${r.change.toFixed(2)}%`}
                   </div>
                 </div>
 
                 {/* trend */}
                 <div className="flex justify-end">
-                  <PoolTrend prices={r.prices} />
+                  <PoolTrend prices={r.prices} current={r.price} muted={r.swapCount === 0} />
                 </div>
 
                 {/* fee — color reddens as it rises above 0.30% */}
