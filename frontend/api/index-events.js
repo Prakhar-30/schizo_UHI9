@@ -14,10 +14,10 @@ import { createClient } from '@supabase/supabase-js'
 import { createPublicClient, http, parseAbi, parseEventLogs } from 'viem'
 import { sepolia } from 'viem/chains'
 
-// v2 multi-pool deployment (2026-06-07).
-const HOOK = '0x9D19eA2aad6c8748d566f28fe375fb8BCAA350c0'
+// v3 fresh deployment (45 pairs).
+const HOOK = '0x58A3A816864F1E5f6F38F01f9f5AE1Cacc9210C0'
 // First block with hook activity (deployed in this session). Backfill starts here.
-const HOOK_DEPLOY_BLOCK = 11006000n
+const HOOK_DEPLOY_BLOCK = 11008000n
 const MAX_RANGE = 9500n // public-RPC getLogs cap
 const MIN_INTERVAL_MS = 8000 // self-throttle so client nudges don't hammer the RPC
 
@@ -39,7 +39,7 @@ const HOOK_ABI = parseAbi([
 
 // Bumped for the v2 hook so the indexer re-backfills from the new deploy block
 // instead of resuming the old hook's cursor.
-const STATE_ID = 'ilbondhook_v2'
+const STATE_ID = 'ilbondhook_v3'
 
 // JSON replacer: bigint → decimal string (everything else passes through).
 const jsonSafe = (obj) => JSON.parse(JSON.stringify(obj, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)))

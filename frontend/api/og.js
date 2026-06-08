@@ -2,29 +2,21 @@ import { ImageResponse } from '@vercel/og'
 import { createElement as h } from 'react'
 import { createPublicClient, http, parseAbi, parseAbiItem } from 'viem'
 import { sepolia } from 'viem/chains'
+import { ADDR } from '../src/config/contracts'
+import { POOLS_BY_ID } from '../src/config/pools'
 
 export const config = { runtime: 'edge' }
 
-// v2 multi-pool deployment.
-const HOOK = '0x9D19eA2aad6c8748d566f28fe375fb8BCAA350c0'
-const POOL_MANAGER = '0xE03A1074c86CFeDd5C142C4F04F1a1536e203543'
-const STATE_VIEW = '0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c'
-const DEPLOY_BLOCK = 11006000n
+// v3 fresh deployment — addresses + the full 45-pair registry come from src/config
+// so this never drifts from the app.
+const HOOK = ADDR.hook
+const POOL_MANAGER = ADDR.poolManager
+const STATE_VIEW = ADDR.stateView
+const DEPLOY_BLOCK = 11008000n
 const RPC = process.env.SEPOLIA_RPC || 'https://ethereum-sepolia-rpc.publicnode.com'
 
-// poolId → { label, premium token symbol + decimals } for the 10 seeded pools.
-const POOLS = {
-  '0x71540b47ef5680786153b43d49b46d3c23ca3ffb2c0b28cb875c078e8a3c600b': { label: 'WETH/USDC', sym1: 'USDC', dec1: 6 },
-  '0x5433b114a0cc035f0fd6f61ef7d7987314ce541ffa9e1c98fa894acfe48699d8': { label: 'WBTC/USDT', sym1: 'USDT', dec1: 6 },
-  '0x8d4683196016e93e0da736d43e97663e200f79de5e4f6aeb2275988e3a0e4e6b': { label: 'WETH/DAI', sym1: 'DAI', dec1: 18 },
-  '0xe859c020fc36c365a3cd6b38e445643130d2f13ab918c47e7f3e53b3548f4bce': { label: 'LINK/WETH', sym1: 'WETH', dec1: 18 },
-  '0xb47bf1c3c9864c2612575cc391e7b5d32788b1d3eb2af76d749a47283778132a': { label: 'WETH/UNI', sym1: 'UNI', dec1: 18 },
-  '0xaf9490a86d6c9f4905022fa944900b432ad7290237290cc575c470512b56077f': { label: 'AAVE/WETH', sym1: 'WETH', dec1: 18 },
-  '0x17f5bbc7d37f4b0144799cea8e60ba9a5584629458c99d769d684ae6602e8f2b': { label: 'GHO/DAI', sym1: 'DAI', dec1: 18 },
-  '0x2691074cfcc71be8f17cb9d5c44833460a90adbfda2bbc72d6dbb0474cccacb2': { label: 'WETH/WBTC', sym1: 'WBTC', dec1: 8 },
-  '0xe2d7dc6ec7bb3180e337df2d090fbdeb4b8e05d4af68d7b27f8a481ef5b36390': { label: 'EURS/WETH', sym1: 'WETH', dec1: 18 },
-  '0xc7b544701fdc8ee307c375c75f2716862296fc0ce19c82ea235a82fdcc96ca54': { label: 'USDC/DAI', sym1: 'DAI', dec1: 18 },
-}
+// poolId(lowercase) → pool meta (label, sym1, dec1) from the shared registry.
+const POOLS = POOLS_BY_ID
 
 const HOOK_ABI = parseAbi([
   'function getPosition(uint256 positionId) view returns (address lp, address feeHolder, address ilHolder, bool active, bool ilBondSold, uint128 liquidity, uint160 entrySqrtPriceX96, int256 ilMarkBps, uint256 markValue, uint256 askPremium)',

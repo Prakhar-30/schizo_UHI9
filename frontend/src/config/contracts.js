@@ -8,8 +8,8 @@ export const SEPOLIA_CHAIN_ID = 11155111
 export const LASNA_CHAIN_ID = 5318007
 
 export const ADDR = {
-  // Sepolia — v2 multi-pool deployment (2026-06-07)
-  hook: '0x9D19eA2aad6c8748d566f28fe375fb8BCAA350c0',
+  // Sepolia — v3 fresh deployment (45 pairs, funded at deploy)
+  hook: '0x58A3A816864F1E5f6F38F01f9f5AE1Cacc9210C0',
   // Legacy single-pool aliases → now point at the DEMO pool (WBTC/WETH).
   // currency0 = WETH (0x748b…), currency1 = WBTC (0x912a…) by address sort.
   token0: '0x748b5C9623528D346C414F4f236B3b5b5c7683cb', // WETH (demo currency0)
@@ -21,7 +21,7 @@ export const ADDR = {
   permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
   callbackProxy: '0xc9f36411C9897e7F959D99ffca2a0Ba7ee0D7bDA',
   // Lasna
-  reactive: '0x7Aaa7EfE149a16Fdf5578b1E5B85E4F38D213655',
+  reactive: '0x27eab090BF647e191A4FB121A780aA6ED89C53E2',
 }
 
 // Legacy demo-pair shorthand (WETH/WBTC). Prefer the full registry in config/pools.js.

@@ -122,6 +122,7 @@ contract ILBondHook is BaseHook, AbstractCallback, IUnlockCallback {
     //                            CONSTANTS
     // ══════════════════════════════════════════════════════════════════════
 
+    uint256 public constant VERSION = 3;          // bump → fresh CREATE2 address on redeploy
     uint24 public constant BASE_FEE = 3000;       // 0.30% — fee floor in calm markets
     uint24 public constant MAX_FEE = 30000;       // 3.00% — fee ceiling in turbulent markets
     uint256 public constant VOL_WINDOW = 8;       // EWMA smoothing window for realized volatility

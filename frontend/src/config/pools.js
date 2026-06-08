@@ -67,45 +67,40 @@ export function poolIdFromKey(key) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  POOL REGISTRY  — the 10 seeded pools. `demo` pool exposes the in-app faucet.
-//  Pairs are defined unordered; buildPoolKey sorts to canonical currency0/1.
+//  POOL REGISTRY  — every C(10,2)=45 token-pair combination, matching the
+//  on-chain FreshDeploy script (same token order). One pair is the `demo` pool
+//  (in-app faucet). Pairs are sorted to canonical currency0/1 by buildPoolKey.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const POOL_DEFS = [
-  { a: 'WETH', b: 'USDC' },
-  { a: 'WBTC', b: 'USDT' },
-  { a: 'WETH', b: 'DAI' },
-  { a: 'LINK', b: 'WETH' },
-  { a: 'UNI', b: 'WETH' },
-  { a: 'AAVE', b: 'WETH' },
-  { a: 'GHO', b: 'DAI' },
-  { a: 'WBTC', b: 'WETH', demo: true }, // designated demo pair (both mintable)
-  { a: 'EURS', b: 'WETH' },
-  { a: 'USDC', b: 'DAI' },
-]
+// The designated demo pair (both tokens mintable) — exposes the faucet.
+const DEMO_PAIR = ['WETH', 'WBTC']
+const isDemoPair = (s0, s1) =>
+  (s0 === DEMO_PAIR[0] && s1 === DEMO_PAIR[1]) || (s0 === DEMO_PAIR[1] && s1 === DEMO_PAIR[0])
 
-const BY_SYMBOL = Object.fromEntries(RAW_TOKENS.map((t) => [t.symbol, t.address]))
-
-export const POOLS = POOL_DEFS.map((d) => {
-  const addrA = BY_SYMBOL[d.a]
-  const addrB = BY_SYMBOL[d.b]
-  const key = buildPoolKey(addrA, addrB)
-  const id = poolIdFromKey(key)
-  const t0 = getToken(key.currency0)
-  const t1 = getToken(key.currency1)
-  return {
-    id,
-    key,
-    token0: key.currency0,
-    token1: key.currency1,
-    sym0: t0.symbol,
-    sym1: t1.symbol,
-    dec0: t0.decimals,
-    dec1: t1.decimals,
-    label: `${t0.symbol}/${t1.symbol}`,
-    demo: !!d.demo,
+export const POOLS = (() => {
+  const list = []
+  for (let i = 0; i < RAW_TOKENS.length; i++) {
+    for (let j = i + 1; j < RAW_TOKENS.length; j++) {
+      const key = buildPoolKey(RAW_TOKENS[i].address, RAW_TOKENS[j].address)
+      const id = poolIdFromKey(key)
+      const t0 = getToken(key.currency0)
+      const t1 = getToken(key.currency1)
+      list.push({
+        id,
+        key,
+        token0: key.currency0,
+        token1: key.currency1,
+        sym0: t0.symbol,
+        sym1: t1.symbol,
+        dec0: t0.decimals,
+        dec1: t1.decimals,
+        label: `${t0.symbol}/${t1.symbol}`,
+        demo: isDemoPair(RAW_TOKENS[i].symbol, RAW_TOKENS[j].symbol),
+      })
+    }
   }
-})
+  return list
+})()
 
 export const POOLS_BY_ID = Object.fromEntries(POOLS.map((p) => [p.id.toLowerCase(), p]))
 
