@@ -368,6 +368,7 @@ export default function PositionDetail() {
 }
 
 function Row({ label, leg, value, mine }) {
+  const net = useNetwork()
   return (
     <div className="flex items-center justify-between gap-2">
       {leg ? <Leg kind={leg} /> : <span className="font-mono text-xs uppercase tracking-wider text-bone/50">{label}</span>}
