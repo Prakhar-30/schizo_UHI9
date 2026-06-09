@@ -257,6 +257,7 @@ export default function PositionDetail() {
                 events={[...history.events].reverse()}
                 isLoading={history.isLoading}
                 emptyLabel="No events for this position yet."
+                positionsById={{ [positionId]: position }}
               />
             </div>
           </Card>
@@ -283,7 +284,7 @@ export default function PositionDetail() {
               <div className="mt-3 flex flex-col gap-2">
                 {canBuy && (
                   <Button variant="risk" size="md" loading={pending} onClick={handleBuy}>
-                    Buy IL-T · {fmtToken(askPremium)} BETA
+                    Buy IL-T · {fmtToken(askPremium, premDec)} {premSym}
                   </Button>
                 )}
                 {isFee && active && (

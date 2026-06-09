@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { sqrtPriceToPrice } from '../lib/il'
+import { amountsForLiquidity } from '../lib/liquidity'
 import { Kicker } from './ui/Bits'
 
 /**
@@ -35,12 +36,21 @@ function fmtPrice(p) {
  * around the entry price. Solving 1 − 2√r/(1+r) = ilBE for r:
  *   x = √r,  x = (1 ± √(1−k²)) / k   with  k = 1 − ilBE
  */
-function breakEvenBand(entry, current, askPremium, liquidity) {
+function breakEvenBand(entry, current, askPremium, liquidity, currentSqrtPriceX96) {
   if (!entry || !current || !askPremium || !liquidity) return null
-  const prem = Number(askPremium)
-  const liq = Number(liquidity)
-  if (!(liq > 0) || !(prem > 0)) return null
-  const ilBE = prem / liq // IL fraction that exactly eats the premium
+  const prem = Number(askPremium) // raw token1 (currency1) smallest units
+  // Position value in the SAME unit (raw token1): amount1 + amount0 · rawPrice.
+  // Comparing premium to raw liquidity L was dimensionally wrong (L ≠ token1
+  // units on non-18-dec pools); this keeps both sides in token1 smallest units.
+  let value = 0
+  try {
+    const { amount0, amount1 } = amountsForLiquidity(currentSqrtPriceX96, BigInt(liquidity))
+    value = Number(amount1) + Number(amount0) * current // `current` = raw price (token1/token0)
+  } catch {
+    value = 0
+  }
+  if (!(value > 0) || !(prem > 0)) return null
+  const ilBE = prem / value // IL fraction that exactly eats the premium
   if (ilBE >= 1) return null // premium >= principal: effectively unbreakable
   const k = 1 - ilBE
   const disc = 1 - k * k
@@ -92,6 +102,7 @@ export default function OutcomeStrip({
         sqrtPriceToPrice(currentSqrtPriceX96),
         askPremium,
         liquidity,
+        currentSqrtPriceX96,
       ),
     [entrySqrtPriceX96, currentSqrtPriceX96, askPremium, liquidity],
   )

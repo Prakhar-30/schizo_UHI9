@@ -35,10 +35,12 @@ export default function SharePanel({ positionId, position, embedded = false }) {
     return `${window.location.origin}/positions/${positionId}?v=${cacheBuster}`
   }, [positionId, cacheBuster])
 
+  // Include the same cache-buster as the share URL so the in-app preview and the
+  // crawler's og:image both re-fetch whenever the position's state changes.
   const ogUrl = useMemo(() => {
     if (typeof window === 'undefined') return ''
-    return `${window.location.origin}/api/og?id=${positionId}`
-  }, [positionId])
+    return `${window.location.origin}/api/og?id=${positionId}&v=${cacheBuster}`
+  }, [positionId, cacheBuster])
 
   const tweetText = useMemo(
     () => composeTweet({ positionId, position, isLp, isFee, isIl }),

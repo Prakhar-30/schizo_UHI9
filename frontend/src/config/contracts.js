@@ -7,6 +7,11 @@ import { parseAbi } from 'viem'
 export const SEPOLIA_CHAIN_ID = 11155111
 export const LASNA_CHAIN_ID = 5318007
 
+// Block the v3 hook was deployed at — the floor for any full-history log scan
+// (e.g. recovering a position's pool from PoolManager ModifyLiquidity events).
+// Keep in sync with api/og.js + api/index-events.js.
+export const DEPLOY_BLOCK = 11008000n
+
 export const ADDR = {
   // Sepolia — v3 fresh deployment (45 pairs, funded at deploy)
   hook: '0x58A3A816864F1E5f6F38F01f9f5AE1Cacc9210C0',

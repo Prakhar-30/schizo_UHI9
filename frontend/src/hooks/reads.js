@@ -10,6 +10,7 @@ import {
   STATEVIEW_ABI,
   SEPOLIA_CHAIN_ID,
   LASNA_CHAIN_ID,
+  DEPLOY_BLOCK,
 } from '../config/contracts'
 import { POOLS, DEMO_POOL, getPoolById, TOKENS } from '../config/pools'
 import { sepolia, LOG_RPC } from '../config/chains'
@@ -17,7 +18,7 @@ import { fetchEventsFromSupabase, supabaseEnabled, nudgeIndexer } from '../lib/s
 import { computeIL, bundleMark } from '../lib/il'
 
 const hookBase = { address: ADDR.hook, abi: HOOK_ABI, chainId: SEPOLIA_CHAIN_ID }
-const REFRESH = 12000
+export const REFRESH = 12000
 
 // Dedicated client for event-log reads — the main RPC may cap getLogs ranges
 // (Alchemy free tier = 10 blocks), so logs read from a permissive public RPC.
@@ -56,13 +57,14 @@ export function usePositionPoolMap() {
     queryKey: ['posPoolMap', ADDR.hook],
     refetchInterval: REFRESH,
     queryFn: async () => {
-      const latest = await logClient.getBlockNumber()
-      const from = latest > LOG_LOOKBACK ? latest - LOG_LOOKBACK : 0n
+      // Scan from the hook's deploy block (not a 32h window) so positions older
+      // than ~9500 blocks still resolve their pool. The public RPC accepts a wide
+      // range here because the query is narrowed by the indexed `sender` filter.
       const logs = await logClient.getLogs({
         address: ADDR.poolManager,
         event: MODIFY_LIQ_EVENT,
         args: { sender: ADDR.hook },
-        fromBlock: from,
+        fromBlock: DEPLOY_BLOCK,
         toBlock: 'latest',
       })
       const map = {}
@@ -311,7 +313,7 @@ export function useActivity({ limit = 50, positionId } = {}) {
       .slice(-limit)
       .reverse()
   }, [r.data, limit, positionId])
-  return { data: events, isLoading: r.isLoading, refetch: r.refetch }
+  return { data: events, isLoading: r.isLoading, refetch: r.refetch, dataUpdatedAt: r.dataUpdatedAt }
 }
 
 // ── per-position history: IL marks + swaps + creation/sale events ───────────
@@ -327,11 +329,13 @@ export function usePositionHistory(positionId, poolId) {
     const events = r.data
       .filter((e) => e.args?.positionId !== undefined && Number(e.args.positionId) === want)
       .sort((a, b) => Number(a.blockNumber - b.blockNumber))
-    // Only this position's pool's swaps (multi-pool safe). If pool unknown, show none
-    // rather than mixing pools.
-    const swaps = r.data
-      .filter((e) => e.name === 'SwapOccurred' && (!wantPool || String(e.args?.poolId).toLowerCase() === wantPool))
-      .sort((a, b) => Number(a.blockNumber - b.blockNumber))
+    // Only this position's pool's swaps (multi-pool safe). If the pool is unknown
+    // show none rather than mixing every pool's prices into one chart.
+    const swaps = wantPool
+      ? r.data
+          .filter((e) => e.name === 'SwapOccurred' && String(e.args?.poolId).toLowerCase() === wantPool)
+          .sort((a, b) => Number(a.blockNumber - b.blockNumber))
+      : []
     const created = events.find((e) => e.name === 'PositionCreated') || null
     const sold = events.find((e) => e.name === 'ILBondSold') || null
 

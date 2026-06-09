@@ -1,15 +1,46 @@
-import { useActivity, useHookCounters, useReactiveStatus } from '../hooks/reads'
+import { useEffect, useMemo, useState } from 'react'
+import { useActivity, useHookCounters, useReactiveStatus, usePositions, REFRESH } from '../hooks/reads'
 import { reactscanAddr, ADDR } from '../config/contracts'
 import ActivityFeed from '../components/ActivityFeed'
 import { Card } from '../components/ui/Card'
 import { Kicker, Dot } from '../components/ui/Bits'
 import Stat from '../components/ui/Stat'
 
+// Small live "auto-refreshing in Ns" pill. Counts down to the next react-query
+// refetch (driven off the query's dataUpdatedAt), and flashes while a fetch is
+// in flight. No manual refresh button — the feed updates itself.
+function AutoRefresh({ dataUpdatedAt, isFetching, intervalMs = REFRESH }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
+  const nextAt = (dataUpdatedAt || now) + intervalMs
+  const secs = Math.max(0, Math.ceil((nextAt - now) / 1000))
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-ink-soft/50 px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider text-bone/50">
+      <Dot color={isFetching ? 'volt' : 'mint'} pulse />
+      {isFetching ? 'refreshing…' : `auto-refresh in ${secs}s`}
+    </div>
+  )
+}
+
 // Platform-wide live activity — every hook event across all pools.
 export default function Pulse() {
-  const { data: activity, isLoading, refetch } = useActivity({ limit: 200 })
+  const { data: activity, isLoading, dataUpdatedAt } = useActivity({ limit: 200 })
   const { nextId, activeCount, bundles } = useHookCounters()
+  const { positions } = usePositions()
   const rsc = useReactiveStatus()
+
+  // Resolve each event's position so ILBondSold shows the correct premium token.
+  const positionsById = useMemo(() => {
+    const m = {}
+    for (const p of positions) m[Number(p.id)] = p
+    return m
+  }, [positions])
+
+  // `isFetching` proxy: the feed just updated within the last second.
+  const isFetching = dataUpdatedAt ? Date.now() - dataUpdatedAt < 1000 : false
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
@@ -42,14 +73,17 @@ export default function Pulse() {
       </div>
 
       <Card className="mt-8 p-5 sm:p-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <Kicker>Most recent first</Kicker>
-          <button onClick={refetch} className="font-mono text-[11px] uppercase tracking-wider text-bone/40 hover:text-volt">
-            ↻ refresh
-          </button>
+          <AutoRefresh dataUpdatedAt={dataUpdatedAt} isFetching={isFetching} />
         </div>
         <div className="mt-3 max-h-[70vh] overflow-y-auto pr-1">
-          <ActivityFeed events={activity} isLoading={isLoading} emptyLabel="No activity yet — make a swap or mint a bond." />
+          <ActivityFeed
+            events={activity}
+            isLoading={isLoading}
+            emptyLabel="No activity yet — make a swap or mint a bond."
+            positionsById={positionsById}
+          />
         </div>
       </Card>
     </div>

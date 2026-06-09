@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Mark } from './Logo'
 import { ADDR, sepoliaAddr, reactscanAddr } from '../../config/contracts'
+import { getToken } from '../../config/pools'
 import { Addr, Divider } from '../ui/Bits'
 
 export default function Footer() {
@@ -64,11 +65,11 @@ export default function Footer() {
                 <Addr value={ADDR.reactive} href={reactscanAddr(ADDR.reactive)} />
               </li>
               <li className="flex items-center justify-between gap-2">
-                <span className="shrink-0 text-bone/45">ALPHA</span>
+                <span className="shrink-0 text-bone/45">{getToken(ADDR.token0).symbol}</span>
                 <Addr value={ADDR.token0} href={sepoliaAddr(ADDR.token0)} />
               </li>
               <li className="flex items-center justify-between gap-2">
-                <span className="shrink-0 text-bone/45">BETA</span>
+                <span className="shrink-0 text-bone/45">{getToken(ADDR.token1).symbol}</span>
                 <Addr value={ADDR.token1} href={sepoliaAddr(ADDR.token1)} />
               </li>
             </ul>

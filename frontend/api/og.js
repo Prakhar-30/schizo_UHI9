@@ -297,6 +297,15 @@ export default async function handler(req) {
         ),
       ),
     ),
-    { width: 1200, height: 630 },
+    {
+      width: 1200,
+      height: 630,
+      // @vercel/og defaults to a 1-YEAR immutable cache, which froze old (BETA-era)
+      // renders forever. Cache briefly + revalidate so the card tracks live state.
+      // The share URL also carries a ?v=<mark> buster so crawlers re-fetch on change.
+      headers: {
+        'cache-control': 'public, max-age=60, s-maxage=120, stale-while-revalidate=600',
+      },
+    },
   )
 }

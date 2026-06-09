@@ -8,10 +8,14 @@ HOOK=0x58A3A816864F1E5f6F38F01f9f5AE1Cacc9210C0
 FEE=8388608   # DYNAMIC_FEE_FLAG
 SPACING=60
 MAXU=$(cast max-uint)
-K1=0a5fb498eef8df9f475c2c622ca64ed7323ba323182762d7cda8bdcb57a47650
-K2=1a0be90f7a3fa6c155d7f44c9eef69d6203262aa80c1d588d5890b141cb732a6
-A1=0x49aBE186a9B24F73E34cCAe3D179299440c352aC
-A2=0xcD46C4C833725bC46b8aA4136BCdd35b615b5BC5
+
+# Load signer keys from frontend/.env (gitignored). Never hardcode keys here.
+ENV_FILE="$(dirname "$0")/../.env"
+if [ -f "$ENV_FILE" ]; then set -a; . "$ENV_FILE"; set +a; fi
+K1=${A1_PRIVATE_KEY:?A1_PRIVATE_KEY not set in frontend/.env}
+K2=${A2_PRIVATE_KEY:?A2_PRIVATE_KEY not set in frontend/.env}
+A1=${A1_ADDRESS:?A1_ADDRESS not set in frontend/.env}
+A2=${A2_ADDRESS:?A2_ADDRESS not set in frontend/.env}
 N=${1:-60}
 GAP=${2:-30}
 SKIP_SETUP=${3:-no}   # pass "noset" on chunked re-runs (approvals/mints already done)

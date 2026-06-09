@@ -316,7 +316,7 @@ export default function Hunt() {
           <div className="max-w-xl">
             <Kicker>What you're buying</Kicker>
             <p className="mt-2 text-sm leading-relaxed text-bone/60">
-              When you buy <Leg kind="il" className="mx-0.5" />, you pay the LP an upfront premium in BETA. In return,
+              When you buy <Leg kind="il" className="mx-0.5" />, you pay the LP an upfront premium in the pool's quote token. In return,
               you take the underlying LP composition — and the impermanent loss with it. The Reactive Network re-prices
               your exposure after every swap, so you always see the live mark.
             </p>

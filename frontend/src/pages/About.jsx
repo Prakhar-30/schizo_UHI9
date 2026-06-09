@@ -1,4 +1,5 @@
 import { ADDR, sepoliaAddr, reactscanAddr } from '../config/contracts'
+import { getToken } from '../config/pools'
 import { Card } from '../components/ui/Card'
 import { Kicker, Chip, Dot, Leg, Divider, Addr } from '../components/ui/Bits'
 import Button from '../components/ui/Button'
@@ -44,8 +45,8 @@ function Step({ i, t, d, tag }) {
 const CONTRACTS = [
   { label: 'ILBondHook', net: 'Sepolia', addr: ADDR.hook, href: sepoliaAddr(ADDR.hook) },
   { label: 'ILBondReactive', net: 'Lasna', addr: ADDR.reactive, href: reactscanAddr(ADDR.reactive) },
-  { label: 'ALPHA (token0)', net: 'Sepolia', addr: ADDR.token0, href: sepoliaAddr(ADDR.token0) },
-  { label: 'BETA (token1)', net: 'Sepolia', addr: ADDR.token1, href: sepoliaAddr(ADDR.token1) },
+  { label: `${getToken(ADDR.token0).symbol} (demo token0)`, net: 'Sepolia', addr: ADDR.token0, href: sepoliaAddr(ADDR.token0) },
+  { label: `${getToken(ADDR.token1).symbol} (demo token1)`, net: 'Sepolia', addr: ADDR.token1, href: sepoliaAddr(ADDR.token1) },
   { label: 'PoolManager', net: 'Sepolia', addr: ADDR.poolManager, href: sepoliaAddr(ADDR.poolManager) },
 ]
 

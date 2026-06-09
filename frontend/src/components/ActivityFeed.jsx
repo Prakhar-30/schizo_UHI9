@@ -14,7 +14,7 @@ const META = {
   ILTokenTransferred: { color: 'text-risk border-risk/30', glyph: '→' },
 }
 
-function describe(name, a) {
+function describe(name, a, posById) {
   switch (name) {
     case 'ILMarkUpdated':
       return (
@@ -50,13 +50,21 @@ function describe(name, a) {
           Position <b className="text-bone">#{a.positionId?.toString()}</b> exited
         </>
       )
-    case 'ILBondSold':
+    case 'ILBondSold': {
+      // Premium is denominated in the position's own pool quote token, with its
+      // decimals. Resolve from the supplied position map; if unknown, omit the
+      // symbol rather than mislabel it.
+      const pos = posById?.[Number(a.positionId)]
+      const premStr = pos
+        ? `${fmtToken(a.premium, pos.premiumDec)} ${pos.premiumSym}`
+        : `${fmtToken(a.premium, pos?.premiumDec ?? 18)}`
       return (
         <>
           <b className="text-bone">{shortAddr(a.buyer)}</b> bought IL-T{' '}
-          <b className="text-risk">#{a.positionId?.toString()}</b> for {fmtToken(a.premium)} BETA
+          <b className="text-risk">#{a.positionId?.toString()}</b> for {premStr}
         </>
       )
+    }
     case 'FeeTokenTransferred':
       return (
         <>
@@ -74,7 +82,7 @@ function describe(name, a) {
   }
 }
 
-export default function ActivityFeed({ events, isLoading, emptyLabel = 'No activity yet.' }) {
+export default function ActivityFeed({ events, isLoading, emptyLabel = 'No activity yet.', positionsById }) {
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 py-10 font-mono text-sm text-bone/40">
@@ -95,7 +103,7 @@ export default function ActivityFeed({ events, isLoading, emptyLabel = 'No activ
               {m.glyph}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm text-bone/80">{describe(e.name, e.args)}</p>
+              <p className="truncate text-sm text-bone/80">{describe(e.name, e.args, positionsById)}</p>
               <div className="mt-0.5 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-bone/30">
                 <span>{timeAgo(e.ts)}</span>
                 {m.rsc && <span className="rounded border border-volt/40 px-1 text-volt">reactive</span>}

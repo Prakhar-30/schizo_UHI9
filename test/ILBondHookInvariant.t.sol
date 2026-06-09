@@ -193,6 +193,15 @@ contract ILBondHookInvariant is BaseTest {
         }
     }
 
+    /// Every inactive (exited) position has had its liquidity zeroed.
+    function invariant_inactiveHasZeroLiquidity() public view {
+        uint256 n = hook.nextPositionId();
+        for (uint256 i; i < n; ++i) {
+            (,,, bool active,, uint128 liq,,,,) = hook.getPosition(i);
+            if (!active) assertEq(liq, 0, "exited position must hold zero liquidity");
+        }
+    }
+
     /// The dynamic fee is always within [BASE_FEE, MAX_FEE].
     function invariant_feeAlwaysBounded() public view {
         uint24 f = hook.currentFee(id);

@@ -35,3 +35,47 @@ export function amountsForLiquidity(sqrtP, L) {
 export function withBuffer(x, bps = 200n) {
   return (x * (10000n + bps)) / 10000n + 1n
 }
+
+// ── inverse: token amount → liquidity (Uniswap LiquidityAmounts) ─────────────
+// Used by the Create page so the user enters a real, decimal-correct token
+// amount and we derive the abstract liquidity (L) the hook needs — instead of
+// asking for raw L (which produces absurd token requirements on non-18-dec
+// pools, e.g. ~1M WBTC for "10 liquidity").
+
+function liquidityForAmount0(sqrtA, sqrtB, amount0) {
+  if (sqrtA > sqrtB) [sqrtA, sqrtB] = [sqrtB, sqrtA]
+  if (sqrtA === 0n || sqrtB === sqrtA) return 0n
+  const intermediate = (sqrtA * sqrtB) / Q96
+  return (amount0 * intermediate) / (sqrtB - sqrtA)
+}
+
+function liquidityForAmount1(sqrtA, sqrtB, amount1) {
+  if (sqrtA > sqrtB) [sqrtA, sqrtB] = [sqrtB, sqrtA]
+  if (sqrtB === sqrtA) return 0n
+  return (amount1 * Q96) / (sqrtB - sqrtA)
+}
+
+/**
+ * Liquidity obtainable from `amount0` of token0 deposited full-range at `sqrtP`.
+ * In range, token0 occupies [sqrtP, upper]. If price has run past the range we
+ * fall back to the whole-range bound so the result is still finite.
+ */
+export function liquidityForToken0(sqrtP, amount0) {
+  if (!amount0 || amount0 <= 0n) return 0n
+  const p = BigInt(sqrtP)
+  if (p >= MAX_SQRT) return liquidityForAmount0(MIN_SQRT, MAX_SQRT, amount0)
+  if (p <= MIN_SQRT) return liquidityForAmount0(MIN_SQRT, MAX_SQRT, amount0)
+  return liquidityForAmount0(p, MAX_SQRT, amount0)
+}
+
+/**
+ * Liquidity obtainable from `amount1` of token1 deposited full-range at `sqrtP`.
+ * In range, token1 occupies [lower, sqrtP].
+ */
+export function liquidityForToken1(sqrtP, amount1) {
+  if (!amount1 || amount1 <= 0n) return 0n
+  const p = BigInt(sqrtP)
+  if (p <= MIN_SQRT) return liquidityForAmount1(MIN_SQRT, MAX_SQRT, amount1)
+  if (p >= MAX_SQRT) return liquidityForAmount1(MIN_SQRT, MAX_SQRT, amount1)
+  return liquidityForAmount1(MIN_SQRT, p, amount1)
+}

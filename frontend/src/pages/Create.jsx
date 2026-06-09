@@ -16,9 +16,9 @@ import { usePool } from '../context/PoolContext'
 import { useTokenInfo, useCurrentPrice } from '../hooks/reads'
 import { useTx } from '../hooks/useTx'
 import { useToast } from '../components/ui/Toast'
-import { amountsForLiquidity, withBuffer } from '../lib/liquidity'
+import { amountsForLiquidity, withBuffer, liquidityForToken0 } from '../lib/liquidity'
 import { humanPrice } from '../lib/il'
-import { fmtToken, fmtNum } from '../lib/format'
+import { fmtToken, fmtNum, fmtCompact } from '../lib/format'
 import { Card } from '../components/ui/Card'
 import { Kicker, Chip, Dot, Leg, Divider } from '../components/ui/Bits'
 import { Field, Input } from '../components/ui/Input'
@@ -44,15 +44,19 @@ export default function Create() {
   const { bal0, bal1, refetch: refetchTokens } = useTokenInfo(address, pool.token0, pool.token1)
   const { data: price } = useCurrentPrice(pool.id)
 
-  const [liq, setLiq] = useState('10')
+  const [deposit0, setDeposit0] = useState('1')
   const [premium, setPremium] = useState('0.1')
 
   const tok0 = getToken(pool.token0)
   const tok1 = getToken(pool.token1)
 
-  const L = safeParse(liq, 18) // liquidity units (contract uint128 L)
-  const ask = safeParse(premium, pool.dec1) // premium paid in currency1
   const sqrtP = price?.sqrtPriceX96 ?? SQRT_PRICE_1_1
+  // The user enters a real amount of token0 (decimal-correct). We derive the
+  // abstract liquidity (L) the hook needs, and the matching token1 amount.
+  const amt0In = safeParse(deposit0, pool.dec0)
+  const ask = safeParse(premium, pool.dec1) // premium paid in currency1
+
+  const L = useMemo(() => liquidityForToken0(sqrtP, amt0In), [sqrtP, amt0In])
 
   const { max0, max1, est0, est1 } = useMemo(() => {
     const est = amountsForLiquidity(sqrtP, L)
@@ -130,17 +134,18 @@ export default function Create() {
             <PoolSelector label="Pool to provide into" />
 
             <Field
-              label="How much to deposit"
-              hint={`Liquidity units to add to ${pool.label}. Bigger means more fees earned — and more impermanent loss to hand off. Anything not used is sent right back to you.`}
+              label={`How much ${tok0.symbol} to deposit`}
+              hint={`Enter an amount of ${tok0.symbol}. We compute the matching ${tok1.symbol} and the liquidity to add to ${pool.label} at the current price. Anything not used is sent right back to you.`}
             >
               <Input
                 type="number"
                 min="0"
-                placeholder="10"
-                value={liq}
-                onChange={(e) => setLiq(e.target.value)}
-                suffix="liquidity"
-                invalid={liq !== '' && L <= 0n}
+                step="any"
+                placeholder="1"
+                value={deposit0}
+                onChange={(e) => setDeposit0(e.target.value)}
+                suffix={tok0.symbol}
+                invalid={deposit0 !== '' && L <= 0n}
               />
             </Field>
 
@@ -174,6 +179,10 @@ export default function Create() {
               </div>
               <Divider className="my-4" />
               <div className="flex items-center justify-between font-mono text-[11px] text-bone/45">
+                <span>liquidity (L) minted</span>
+                <span className="text-bone/70">{L > 0n ? fmtCompact(L) : '—'}</span>
+              </div>
+              <div className="mt-1.5 flex items-center justify-between font-mono text-[11px] text-bone/45">
                 <span>max pulled (refundable)</span>
                 <span className="text-bone/70">
                   {fmtToken(max0, pool.dec0)} {tok0.symbol} · {fmtToken(max1, pool.dec1)} {tok1.symbol}

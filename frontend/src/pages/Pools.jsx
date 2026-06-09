@@ -9,13 +9,19 @@ import { Card } from '../components/ui/Card'
 import { Kicker, Chip, Spinner } from '../components/ui/Bits'
 import PoolTrend from '../components/PoolTrend'
 
-const SORTS = [
-  { key: 'liq-desc', label: 'Liquidity' },
-  { key: 'change-desc', label: 'Top movers' },
-  { key: 'change-asc', label: 'Worst movers' },
-  { key: 'fee-desc', label: 'Highest fee' },
-  { key: 'name', label: 'Name' },
+// Uniswap-style table: click a column header to sort by it, click again to flip
+// direction. The active column shows a ▲/▼ caret. Numeric columns default to
+// descending on first click; the name column defaults to ascending.
+const COLUMNS = [
+  { key: 'name', label: 'Pair', align: 'left', sortable: true, defaultDir: 'asc' },
+  { key: 'price', label: 'Price', align: 'right', sortable: true, defaultDir: 'desc' },
+  { key: 'trend', label: 'Trend', align: 'right', sortable: false },
+  { key: 'activity', label: 'Activity', align: 'right', sortable: true, defaultDir: 'desc' },
+  { key: 'fee', label: 'Fee (live)', align: 'right', sortable: true, defaultDir: 'desc' },
+  { key: 'liquidity', label: 'Liquidity', align: 'right', sortable: true, defaultDir: 'desc' },
 ]
+// Full literal (incl. the `lg:` variant) so Tailwind's JIT scanner emits the CSS.
+const GRID_LG = 'lg:grid-cols-[1.4fr_1fr_0.9fr_0.8fr_0.9fr_1.1fr]'
 
 // Continuous green→red as the live fee climbs above the 0.30% base toward the 3% cap.
 function feeStyle(pips) {
@@ -31,13 +37,22 @@ export default function Pools() {
   const navigate = useNavigate()
   const { setPoolId } = usePool()
   const { byId, isLoading } = usePoolStats()
-  const { data: series } = usePoolSwapSeries()
+  const { data: series, isLoading: seriesLoading } = usePoolSwapSeries()
   const [q, setQ] = useState('')
-  const [sort, setSort] = useState('liq-desc')
+  const [sort, setSort] = useState({ key: 'liquidity', dir: 'desc' })
 
   const openPool = (id) => {
     setPoolId(id)
     navigate('/create')
+  }
+
+  const toggleSort = (col) => {
+    if (!col.sortable) return
+    setSort((s) =>
+      s.key === col.key
+        ? { key: col.key, dir: s.dir === 'asc' ? 'desc' : 'asc' }
+        : { key: col.key, dir: col.defaultDir },
+    )
   }
 
   const rows = useMemo(() => {
@@ -48,12 +63,8 @@ export default function Pools() {
         .map((s) => humanPrice(s.sqrtPriceX96, p.dec0, p.dec1))
         .filter((v) => Number.isFinite(v) && v > 0)
       const price = stat ? humanPrice(stat.sqrtPriceX96, p.dec0, p.dec1) : 0
-      // Anchor every sparkline at the pool's 1:1 launch baseline (by deploy design
-      // each pool initialized at human price ≈ 1.0), then plot each observed swap,
-      // ending at the live price. This way a thin pool with a single swap still
-      // shows its real move since launch instead of a single flat point; only the
-      // genuinely untraded pools stay flat. Collapse consecutive duplicates so
-      // flat runs don't waste sparkline width.
+      // Anchor every sparkline at the pool's 1:1 launch baseline, then plot each
+      // observed swap, ending at the live price. Collapse consecutive duplicates.
       const LAUNCH = 1
       const raw = [LAUNCH, ...swapPrices, ...(price > 0 ? [price] : [])]
       const prices = raw.filter((v, i) => i === 0 || v !== raw[i - 1])
@@ -71,15 +82,23 @@ export default function Pools() {
     const filtered = q
       ? list.filter((r) => r.label.toLowerCase().includes(q.toLowerCase().replace(/\s/g, '')))
       : list
-    const s = [...filtered]
-    switch (sort) {
-      case 'liq-desc': s.sort((a, b) => Number((b.liquidity || 0n) - (a.liquidity || 0n))); break
-      case 'change-desc': s.sort((a, b) => b.change - a.change); break
-      case 'change-asc': s.sort((a, b) => a.change - b.change); break
-      case 'fee-desc': s.sort((a, b) => (b.dynFee || 0) - (a.dynFee || 0)); break
-      case 'name': s.sort((a, b) => a.label.localeCompare(b.label)); break
-      default: break
-    }
+    const dir = sort.dir === 'asc' ? 1 : -1
+    const s = [...filtered].sort((a, b) => {
+      switch (sort.key) {
+        case 'name':
+          return a.label.localeCompare(b.label) * dir
+        case 'price':
+          return (a.change - b.change) * dir
+        case 'activity':
+          return (a.swapCount - b.swapCount) * dir
+        case 'fee':
+          return ((a.dynFee || 0) - (b.dynFee || 0)) * dir
+        case 'liquidity':
+          return Number((a.liquidity || 0n) - (b.liquidity || 0n)) * dir
+        default:
+          return 0
+      }
+    })
     return s
   }, [byId, series, q, sort])
 
@@ -98,36 +117,37 @@ export default function Pools() {
         </div>
       </div>
 
-      {/* controls */}
-      <div className="mt-8 flex flex-wrap items-center gap-3">
+      {/* search */}
+      <div className="mt-8">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="search pair, e.g. WETH or USDC"
-          className="min-w-0 flex-1 rounded-lg border-2 border-white/12 bg-ink-soft/60 px-3 py-2 font-mono text-sm text-bone outline-none focus:border-volt/50 sm:max-w-xs"
+          placeholder="Search pair, e.g. WETH or USDC"
+          className="w-full rounded-lg border-2 border-white/12 bg-ink-soft/60 px-3 py-2.5 font-mono text-sm text-bone outline-none focus:border-volt/50 sm:max-w-sm"
         />
-        <div className="flex flex-wrap gap-1.5">
-          {SORTS.map((s) => (
-            <button
-              key={s.key}
-              onClick={() => setSort(s.key)}
-              className={`rounded-lg border px-2.5 py-1.5 font-mono text-[11px] uppercase tracking-wider transition-colors ${
-                sort === s.key ? 'border-volt/60 bg-volt/10 text-volt' : 'border-white/12 text-bone/55 hover:border-white/25'
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
       </div>
 
-      {/* list header (lg) */}
-      <div className="mt-6 hidden grid-cols-[1.4fr_1fr_0.9fr_0.9fr_1.1fr] gap-4 px-4 font-mono text-[10px] uppercase tracking-wider text-bone/30 lg:grid">
-        <span>Pair</span>
-        <span className="text-right">Price</span>
-        <span className="text-right">Trend</span>
-        <span className="text-right">Fee (live)</span>
-        <span className="text-right">Liquidity</span>
+      {/* sortable column headers (lg) */}
+      <div className={`mt-6 hidden ${GRID_LG} gap-4 border-b border-white/10 px-4 pb-2 lg:grid`}>
+        {COLUMNS.map((c) => {
+          const active = sort.key === c.key
+          return (
+            <button
+              key={c.key}
+              onClick={() => toggleSort(c)}
+              disabled={!c.sortable}
+              className={`flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider transition-colors ${
+                c.align === 'right' ? 'justify-end' : ''
+              } ${c.sortable ? 'cursor-pointer hover:text-bone' : 'cursor-default'} ${
+                active ? 'text-volt' : 'text-bone/30'
+              }`}
+            >
+              {c.align === 'right' && active && <span>{sort.dir === 'asc' ? '▲' : '▼'}</span>}
+              {c.label}
+              {c.align === 'left' && active && <span>{sort.dir === 'asc' ? '▲' : '▼'}</span>}
+            </button>
+          )
+        })}
       </div>
 
       {isLoading && rows.every((r) => !r.liquidity) ? (
@@ -143,7 +163,7 @@ export default function Pools() {
               className="cursor-pointer p-4 transition-colors hover:border-volt/40"
               title={`Provide IL-bonded liquidity on ${r.label}`}
             >
-              <div className="grid grid-cols-2 items-center gap-4 lg:grid-cols-[1.4fr_1fr_0.9fr_0.9fr_1.1fr]">
+              <div className={`grid grid-cols-2 items-center gap-4 ${GRID_LG}`}>
                 {/* pair */}
                 <div className="flex items-center gap-2">
                   <span className="font-display text-base font-bold">{r.label}</span>
@@ -167,18 +187,30 @@ export default function Pools() {
 
                 {/* trend */}
                 <div className="flex justify-end">
-                  <PoolTrend prices={r.prices} current={r.price} muted={r.swapCount === 0} />
+                  <PoolTrend prices={r.prices} current={r.price} muted={r.swapCount === 0} loading={seriesLoading && r.swapCount === 0} />
+                </div>
+
+                {/* activity (swap count) */}
+                <div className="hidden text-right font-mono text-sm tabular-nums text-bone/70 lg:block">
+                  {seriesLoading && r.swapCount === 0 ? '…' : r.swapCount}
                 </div>
 
                 {/* fee — color reddens as it rises above 0.30% */}
-                <div className="text-right font-mono text-sm font-bold tabular-nums" style={feeStyle(r.dynFee)}>
+                <div className="hidden text-right font-mono text-sm font-bold tabular-nums lg:block" style={feeStyle(r.dynFee)}>
                   {r.dynFee !== undefined ? `${(r.dynFee / 10000).toFixed(3)}%` : '—'}
                 </div>
 
                 {/* liquidity */}
-                <div className="text-right font-mono text-sm tabular-nums text-bone/70">
+                <div className="hidden text-right font-mono text-sm tabular-nums text-bone/70 lg:block">
                   {r.liquidity !== undefined ? fmtCompact(r.liquidity) : '—'}
                 </div>
+              </div>
+
+              {/* compact stats on small screens (fee + liquidity + activity) */}
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/8 pt-3 font-mono text-[11px] tabular-nums text-bone/50 lg:hidden">
+                <span>{seriesLoading && r.swapCount === 0 ? '…' : `${r.swapCount} swaps`}</span>
+                <span style={feeStyle(r.dynFee)}>{r.dynFee !== undefined ? `${(r.dynFee / 10000).toFixed(3)}% fee` : '—'}</span>
+                <span>{r.liquidity !== undefined ? `${fmtCompact(r.liquidity)} L` : '—'}</span>
               </div>
             </Card>
           ))}

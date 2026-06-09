@@ -2,9 +2,19 @@
 // 1:1 launch and ends at the live price, so any pool that has traded shows its
 // real move (green up / red down). `muted` = the pool has had zero swaps, so it
 // renders grey & flat (nothing has happened yet) rather than implying a trend.
-export default function PoolTrend({ prices, current, muted = false, width = 140, height = 40 }) {
+export default function PoolTrend({ prices, current, muted = false, loading = false, width = 140, height = 40 }) {
   const hasTrend = !muted && prices && prices.length >= 2
   let series = prices && prices.length >= 2 ? prices : current && current > 0 ? [current, current] : null
+
+  // While the swap series is still loading, show a pulsing placeholder bar
+  // instead of a misleading flat line.
+  if (loading) {
+    return (
+      <div className="flex items-center justify-end" style={{ width, height }}>
+        <div className="h-2 w-full animate-pulse rounded-full bg-white/10" />
+      </div>
+    )
+  }
 
   if (!series) {
     return (
