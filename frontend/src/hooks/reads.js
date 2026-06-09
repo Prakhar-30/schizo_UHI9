@@ -53,13 +53,30 @@ const MODIFY_LIQ_EVENT = parseAbiItem(
   'event ModifyLiquidity(bytes32 indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt)',
 )
 export function usePositionPoolMap() {
-  return useQuery({
-    queryKey: ['posPoolMap', ADDR.hook],
+  // Backend-first: the indexer folds each position's poolId into its
+  // PositionCreated event args (see api/index-events.js + backfill script), so we
+  // read it straight from Supabase via useAllEvents — no RPC. Only when the
+  // backend yields nothing (Supabase unconfigured / not yet backfilled) do we
+  // fall back to an on-chain PoolManager.ModifyLiquidity scan.
+  const ev = useAllEvents()
+  const fromEvents = useMemo(() => {
+    const m = {}
+    for (const e of ev.data || []) {
+      if (e.name === 'PositionCreated' && e.args?.poolId) {
+        const pid = Number(e.args.positionId)
+        if (m[pid] === undefined) m[pid] = String(e.args.poolId).toLowerCase()
+      }
+    }
+    return m
+  }, [ev.data])
+
+  const needFallback = Object.keys(fromEvents).length === 0
+
+  const fallback = useQuery({
+    queryKey: ['posPoolMapRpc', ADDR.hook],
+    enabled: needFallback,
     refetchInterval: REFRESH,
     queryFn: async () => {
-      // Scan from the hook's deploy block (not a 32h window) so positions older
-      // than ~9500 blocks still resolve their pool. The public RPC accepts a wide
-      // range here because the query is narrowed by the indexed `sender` filter.
       const logs = await logClient.getLogs({
         address: ADDR.poolManager,
         event: MODIFY_LIQ_EVENT,
@@ -75,6 +92,8 @@ export function usePositionPoolMap() {
       return map
     },
   })
+
+  return { data: needFallback ? fallback.data : fromEvents }
 }
 
 // ── all positions (getPosition + getRange per id), annotated with their pool ──

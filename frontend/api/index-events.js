@@ -11,11 +11,13 @@
 //  Uses the SERVICE-ROLE key (server-only) so it can write past RLS.
 // ───────────────────────────────────────────────────────────────────────────
 import { createClient } from '@supabase/supabase-js'
-import { createPublicClient, http, parseAbi, parseEventLogs } from 'viem'
+import { createPublicClient, http, parseAbi, parseAbiItem, parseEventLogs } from 'viem'
 import { sepolia } from 'viem/chains'
 
 // v3 fresh deployment (45 pairs).
 const HOOK = '0x58A3A816864F1E5f6F38F01f9f5AE1Cacc9210C0'
+// PoolManager — source of the position→pool link (salt = positionId, id = poolId).
+const POOL_MANAGER = '0xE03A1074c86CFeDd5C142C4F04F1a1536e203543'
 // First block with hook activity (deployed in this session). Backfill starts here.
 const HOOK_DEPLOY_BLOCK = 11008000n
 const MAX_RANGE = 9500n // public-RPC getLogs cap
@@ -36,6 +38,12 @@ const HOOK_ABI = parseAbi([
   'event ILBondDataBundle(uint256 indexed bundleId, bytes data)',
   'event CycleCompleted(uint256 timestamp, uint256 positionsChecked)',
 ])
+
+// PoolManager event we use only to recover each position's poolId (the hook's
+// PositionCreated event doesn't carry it). salt = bytes32(positionId), id = poolId.
+const MODIFY_LIQ = parseAbiItem(
+  'event ModifyLiquidity(bytes32 indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt)',
+)
 
 // Bumped for the v2 hook so the indexer re-backfills from the new deploy block
 // instead of resuming the old hook's cursor.
@@ -86,16 +94,41 @@ export default async function handler(req, res) {
           }),
         )
 
-        const rows = decoded.map((l) => ({
-          tx_hash: l.transactionHash,
-          log_index: l.logIndex,
-          event_name: l.eventName,
-          position_id: l.args?.positionId !== undefined ? Number(l.args.positionId) : null,
-          block_number: Number(l.blockNumber),
-          block_ts: tsCache.get(l.blockNumber),
-          hook_address: HOOK.toLowerCase(), // tag rows so the frontend can filter by deployment
-          args: jsonSafe(l.args || {}),
-        }))
+        // For any PositionCreated in this chunk, recover its poolId from the
+        // PoolManager ModifyLiquidity log in the same range and fold it into the
+        // event args so the frontend can read it backend-first (no RPC scan).
+        const pidPool = {}
+        if (decoded.some((l) => l.eventName === 'PositionCreated')) {
+          const ml = await client.getLogs({
+            address: POOL_MANAGER,
+            event: MODIFY_LIQ,
+            args: { sender: HOOK },
+            fromBlock: start,
+            toBlock: end,
+          })
+          for (const l of ml) {
+            const pid = Number(BigInt(l.args.salt))
+            if (pidPool[pid] === undefined) pidPool[pid] = String(l.args.id).toLowerCase()
+          }
+        }
+
+        const rows = decoded.map((l) => {
+          const base = jsonSafe(l.args || {})
+          if (l.eventName === 'PositionCreated') {
+            const poolId = pidPool[Number(l.args.positionId)]
+            if (poolId) base.poolId = poolId
+          }
+          return {
+            tx_hash: l.transactionHash,
+            log_index: l.logIndex,
+            event_name: l.eventName,
+            position_id: l.args?.positionId !== undefined ? Number(l.args.positionId) : null,
+            block_number: Number(l.blockNumber),
+            block_ts: tsCache.get(l.blockNumber),
+            hook_address: HOOK.toLowerCase(), // tag rows so the frontend can filter by deployment
+            args: base,
+          }
+        })
 
         const { error } = await db
           .from('hook_events')

@@ -15,6 +15,9 @@ create table if not exists public.hook_events (
   block_ts     bigint  not null,  -- unix seconds
   hook_address text,              -- which hook deployment emitted this (v2 multi-pool)
   args         jsonb   not null,  -- decoded event args; bigints stored as decimal strings
+                                   -- NOTE: PositionCreated rows are enriched with
+                                   -- args.poolId (recovered from PoolManager.ModifyLiquidity)
+                                   -- so the app resolves a position's pool backend-first.
   primary key (tx_hash, log_index)
 );
 
