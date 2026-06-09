@@ -1,22 +1,51 @@
 import { ImageResponse } from '@vercel/og'
 import { createElement as h } from 'react'
 import { createPublicClient, http, parseAbi, parseAbiItem } from 'viem'
-import { sepolia } from 'viem/chains'
 import { ADDR } from '../src/config/contracts'
-import { POOLS_BY_ID } from '../src/config/pools'
+import { buildPoolRegistry, SEPOLIA_RAW_TOKENS } from '../src/config/pools'
 
 export const config = { runtime: 'edge' }
 
-// v3 fresh deployment — addresses + the full 45-pair registry come from src/config
-// so this never drifts from the app.
-const HOOK = ADDR.hook
-const POOL_MANAGER = ADDR.poolManager
-const STATE_VIEW = ADDR.stateView
-const DEPLOY_BLOCK = 11008000n
-const RPC = process.env.SEPOLIA_RPC || 'https://ethereum-sepolia-rpc.publicnode.com'
+// ── per-chain config (mirrors src/config/networks.js, kept self-contained so the
+//    Edge runtime doesn't import Vite's import.meta.env). The OG card is rendered
+//    for whichever chain the share URL carries (?chain=<id>), so Unichain
+//    positions get a Unichain card and Sepolia positions a Sepolia card.
+const UNICHAIN_RAW_TOKENS = [
+  { address: '0x20D8D70AF616471Ff6e651f89Ff2cA1cA3fb5010', symbol: 'mWETH', name: 'Mock Wrapped Ether', decimals: 18 },
+  { address: '0x93336712394A7bE6DC61CFCF38d0431185B5c3A2', symbol: 'mWBTC', name: 'Mock Wrapped BTC', decimals: 8 },
+  { address: '0x173e3Ab5Db82a0A67ee2B4a640E8848440aD149f', symbol: 'mUSDC', name: 'Mock USD Coin', decimals: 6 },
+]
 
-// poolId(lowercase) → pool meta (label, sym1, dec1) from the shared registry.
-const POOLS = POOLS_BY_ID
+const chainDef = (id, name, rpc) => ({
+  id,
+  name,
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: { default: { http: [rpc] } },
+})
+
+const SEPOLIA_RPC = process.env.SEPOLIA_RPC || 'https://ethereum-sepolia-rpc.publicnode.com'
+const UNICHAIN_RPC = process.env.UNICHAIN_RPC || 'https://sepolia.unichain.org'
+
+const NETWORKS = {
+  11155111: {
+    hook: ADDR.hook,
+    poolManager: ADDR.poolManager,
+    stateView: ADDR.stateView,
+    deployBlock: 11008000n,
+    rpc: SEPOLIA_RPC,
+    chain: chainDef(11155111, 'Ethereum Sepolia', SEPOLIA_RPC),
+    poolsById: buildPoolRegistry({ rawTokens: SEPOLIA_RAW_TOKENS, hook: ADDR.hook, demoPair: ['WETH', 'WBTC'] }).poolsById,
+  },
+  1301: {
+    hook: '0x56B99A42E41D5987b2F39E97F3EBe5f3d76e10C0',
+    poolManager: '0x00B036B58a818B1BC34d502D3fE730Db729e62AC',
+    stateView: '0xc199F1072a74D4e905ABa1A84d9a45E2546B6222',
+    deployBlock: 54154700n,
+    rpc: UNICHAIN_RPC,
+    chain: chainDef(1301, 'Unichain Sepolia', UNICHAIN_RPC),
+    poolsById: buildPoolRegistry({ rawTokens: UNICHAIN_RAW_TOKENS, hook: '0x56B99A42E41D5987b2F39E97F3EBe5f3d76e10C0', demoPair: ['mWETH', 'mUSDC'] }).poolsById,
+  },
+}
 
 const HOOK_ABI = parseAbi([
   'function getPosition(uint256 positionId) view returns (address lp, address feeHolder, address ilHolder, bool active, bool ilBondSold, uint128 liquidity, uint160 entrySqrtPriceX96, int256 ilMarkBps, uint256 markValue, uint256 askPremium)',
@@ -28,18 +57,16 @@ const MODIFY_LIQ_EVENT = parseAbiItem(
   'event ModifyLiquidity(bytes32 indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt)',
 )
 
-const client = createPublicClient({ chain: sepolia, transport: http(RPC) })
-
 // Recover a position's poolId from the PoolManager ModifyLiquidity log
 // (the hook mints with salt = bytes32(positionId)).
-async function poolIdForPosition(id) {
+async function poolIdForPosition(client, cfg, id) {
   try {
     const head = await client.getBlockNumber()
     const logs = await client.getLogs({
-      address: POOL_MANAGER,
+      address: cfg.poolManager,
       event: MODIFY_LIQ_EVENT,
-      args: { sender: HOOK },
-      fromBlock: DEPLOY_BLOCK,
+      args: { sender: cfg.hook },
+      fromBlock: cfg.deployBlock,
       toBlock: head,
     })
     for (const l of logs) {
@@ -114,11 +141,16 @@ function Stat(label, value, color) {
 export default async function handler(req) {
   const url = new URL(req.url)
   const id = (url.searchParams.get('id') || '0').replace(/[^0-9]/g, '') || '0'
+  // Which deployment to render the card for (defaults to Sepolia).
+  const chainId = Number((url.searchParams.get('chain') || '11155111').replace(/[^0-9]/g, '')) || 11155111
+  const cfg = NETWORKS[chainId] || NETWORKS[11155111]
+  const POOLS = cfg.poolsById
+  const client = createPublicClient({ chain: cfg.chain, transport: http(cfg.rpc) })
 
   let pos = null
   try {
     const r = await client.readContract({
-      address: HOOK,
+      address: cfg.hook,
       abi: HOOK_ABI,
       functionName: 'getPosition',
       args: [BigInt(id)],
@@ -141,12 +173,12 @@ export default async function handler(req) {
   let pool = null
   let ilNum = pos ? Number(pos.ilMarkBps) : 0
   if (pos) {
-    const poolId = await poolIdForPosition(id)
+    const poolId = await poolIdForPosition(client, cfg, id)
     pool = poolId ? POOLS[poolId] : null
     if (poolId) {
       try {
         const slot0 = await client.readContract({
-          address: STATE_VIEW,
+          address: cfg.stateView,
           abi: STATE_VIEW_ABI,
           functionName: 'getSlot0',
           args: [poolId],

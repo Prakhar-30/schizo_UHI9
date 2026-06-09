@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
+import { useNetwork } from '../context/NetworkContext'
 import { Card } from './ui/Card'
 import { Kicker } from './ui/Bits'
 import Button from './ui/Button'
@@ -14,6 +15,7 @@ import { fmtToken, copy, isSameAddr } from '../lib/format'
  */
 export default function SharePanel({ positionId, position, embedded = false }) {
   const { address } = useAccount()
+  const net = useNetwork()
   const [copied, setCopied] = useState(false)
   const [imgOk, setImgOk] = useState(true)
 
@@ -30,17 +32,19 @@ export default function SharePanel({ positionId, position, embedded = false }) {
     return `${positionId}-${mark}`
   }, [positionId, position?.liveIlBps, position?.ilMarkBps])
 
+  // Carry the active chain so the card is rendered for the right deployment
+  // (a Unichain position gets a Unichain card, not the Sepolia one).
   const shareUrl = useMemo(() => {
     if (typeof window === 'undefined') return ''
-    return `${window.location.origin}/positions/${positionId}?v=${cacheBuster}`
-  }, [positionId, cacheBuster])
+    return `${window.location.origin}/positions/${positionId}?v=${cacheBuster}&chain=${net.chainId}`
+  }, [positionId, cacheBuster, net.chainId])
 
-  // Include the same cache-buster as the share URL so the in-app preview and the
-  // crawler's og:image both re-fetch whenever the position's state changes.
+  // Include the same cache-buster + chain so the in-app preview and the crawler's
+  // og:image both re-fetch whenever the position's state (or chain) changes.
   const ogUrl = useMemo(() => {
     if (typeof window === 'undefined') return ''
-    return `${window.location.origin}/api/og?id=${positionId}&v=${cacheBuster}`
-  }, [positionId, cacheBuster])
+    return `${window.location.origin}/api/og?id=${positionId}&v=${cacheBuster}&chain=${net.chainId}`
+  }, [positionId, cacheBuster, net.chainId])
 
   const tweetText = useMemo(
     () => composeTweet({ positionId, position, isLp, isFee, isIl }),

@@ -13,6 +13,8 @@ export default async function handler(req) {
   // Cache-buster forwarded from the share URL (?v=<id>-<mark>). Threaded into the
   // og:image URL so X / Telegram re-fetch the card when the position changes.
   const v = (url.searchParams.get('v') || '').replace(/[^0-9a-zA-Z._-]/g, '')
+  // Which chain's deployment to render the card for (defaults Sepolia in og.js).
+  const chain = (url.searchParams.get('chain') || '').replace(/[^0-9]/g, '')
   const origin = url.origin
 
   // Pull the static SPA shell. The internal fetch hits the static-file
@@ -36,7 +38,7 @@ export default async function handler(req) {
     })
   }
 
-  const ogImage = origin + '/api/og?id=' + id + (v ? '&v=' + v : '')
+  const ogImage = origin + '/api/og?id=' + id + (v ? '&v=' + v : '') + (chain ? '&chain=' + chain : '')
   const title = 'Position #' + id + ' · schizō'
   const desc =
     'IL bond on schizō. Live impermanent-loss mark posted by the Reactive Network on every swap.'
