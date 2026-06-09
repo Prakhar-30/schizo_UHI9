@@ -49,14 +49,15 @@ No cron. No off-chain bot. No trust. The mark moves exactly when reality moves â
 
 ## It's real, and it's running
 
-This isn't a slide deck. There's a deployed platform with **45 live pools**, dynamic fees, and the full reactive loop firing on every swap.
+This isn't a slide deck. The whole system is deployed and live â€” and it runs on **two chains independently**, with the frontend switching every address by the connected wallet's chain.
 
-| | |
-|---|---|
-| ILBondHook (Sepolia) | `0x58A3A816864F1E5f6F38F01f9f5AE1Cacc9210C0` |
-| ILBondReactive (Lasna) | `0x27eab090BF647e191A4FB121A780aA6ED89C53E2` |
-| Pools | 45 pairs across 10 tokens (2/6/8/18 decimals) |
-| Frontend | https://schizo-il-bond.vercel.app |
+| | Ethereum Sepolia | Unichain Sepolia |
+|---|---|---|
+| ILBondHook | `0x58A3A816864F1E5f6F38F01f9f5AE1Cacc9210C0` | `0x56B99A42E41D5987b2F39E97F3EBe5f3d76e10C0` |
+| ILBondReactive (Lasna) | `0x27eab090BF647e191A4FB121A780aA6ED89C53E2` | `0x4F193c807b4BD93054332bc67e64428725AA107D` |
+| Pools | 45 pairs (10 tokens, 2/6/8/18 decimals) | 3 pairs (mWETH/mWBTC/mUSDC) |
+
+Frontend: https://schizo-il-bond.vercel.app
 
 What works today:
 - LPs mint FEE-T + IL-T from a real full-range v4 deposit, decimal-correct across every pool.

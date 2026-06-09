@@ -122,6 +122,19 @@ The frontend is a production React/Vite app (wagmi + viem + RainbowKit). Beyond 
 
 All three are marked live by the RSC and resolve their pool backend-first from Supabase.
 
+### Second deployment — Unichain Sepolia (1301)
+
+The exact same system was deployed, independently, on Unichain Sepolia to prove portability — a separate hook, a separate Reactive contract, fresh mock tokens, and its own pools. The frontend carries a per-chain network registry (`frontend/src/config/networks.js`) and resolves every address / token / pool / explorer from the connected wallet's chain, so the two deployments never touch each other.
+
+| Contract | Network | Address |
+|---|---|---|
+| ILBondHook | Unichain Sepolia | `0x56B99A42E41D5987b2F39E97F3EBe5f3d76e10C0` |
+| ILBondReactive | Lasna | `0x4F193c807b4BD93054332bc67e64428725AA107D` |
+| PoolManager | Unichain Sepolia | `0x00B036B58a818B1BC34d502D3fE730Db729e62AC` |
+| Callback proxy | Unichain Sepolia | `0x9299472A6399Fd1027ebF067571Eb3e3D7837FC4` |
+
+3 fresh mintable tokens (mWETH 18 / mWBTC 8 / mUSDC 6) → 3 pools (mWETH/mWBTC, mWETH/mUSDC, mWBTC/mUSDC), each seeded; 2 IL-bond positions opened (mWETH/mUSDC, mWBTC/mUSDC); 6+ mixed-direction swaps. Dynamic fees verified moving on-chain (e.g. mWETH/mUSDC `currentFee` 3154 pips after swaps). The hook is funded for callbacks and the RSC funded with 10 REACT. Deployed via `script/30_UnichainDeploy.s.sol` + `31_UnichainSwaps.s.sol`; the RSC via `forge create` with `destChainId = 1301`. (As with any fresh reactive deployment, the on-chain mark loop activates once the Reactive Network's origin subscription for the new chain propagates; the UI derives live IL from pool price meanwhile, so nothing reads blank.)
+
 ---
 
 ## 7. Testing
