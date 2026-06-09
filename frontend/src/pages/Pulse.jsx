@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useActivity, useHookCounters, useReactiveStatus, usePositions, REFRESH } from '../hooks/reads'
-import { reactscanAddr, ADDR } from '../config/contracts'
+import { useNetwork } from '../context/NetworkContext'
 import ActivityFeed from '../components/ActivityFeed'
 import { Card } from '../components/ui/Card'
 import { Kicker, Dot } from '../components/ui/Bits'
@@ -27,6 +27,7 @@ function AutoRefresh({ dataUpdatedAt, isFetching, intervalMs = REFRESH }) {
 
 // Platform-wide live activity — every hook event across all pools.
 export default function Pulse() {
+  const net = useNetwork()
   const { data: activity, isLoading, dataUpdatedAt } = useActivity({ limit: 200 })
   const { nextId, activeCount, bundles } = useHookCounters()
   const { positions } = usePositions()
@@ -54,7 +55,7 @@ export default function Pulse() {
           </p>
         </div>
         <a
-          href={reactscanAddr(ADDR.reactive)}
+          href={net.reactscanUrl(net.addr.reactive)}
           target="_blank"
           rel="noreferrer"
           className="card-flat flex items-center gap-3 px-4 py-3"

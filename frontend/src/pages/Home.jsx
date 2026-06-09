@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useHookCounters, useReactiveStatus } from '../hooks/reads'
+import { useNetwork } from '../context/NetworkContext'
 import Button from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Kicker, Chip, Dot } from '../components/ui/Bits'
@@ -17,6 +18,7 @@ function HeroStat({ label, value, accent }) {
 }
 
 export default function Home() {
+  const net = useNetwork()
   const { nextId, activeCount, bundles } = useHookCounters()
   const rsc = useReactiveStatus()
 
@@ -28,7 +30,7 @@ export default function Home() {
           <div>
             <div className="mb-6 inline-flex items-center gap-2">
               <Chip color="volt">
-                <Dot color="volt" pulse /> Live on Sepolia
+                <Dot color="volt" pulse /> Live on {net.name}
               </Chip>
             </div>
 
@@ -163,7 +165,7 @@ export default function Home() {
             <div className="relative grid place-items-center overflow-x-auto border-t-2 border-white/10 bg-ink-soft/40 p-6 sm:p-10 lg:border-l-2 lg:border-t-0">
               <div className="absolute inset-0 grid-bg opacity-40" />
               <pre className="relative font-mono text-[10px] leading-relaxed text-bone/70 sm:text-xs">
-{`Sepolia                  Lasna
+{`${net.short.padEnd(8)}                 Lasna
 ┌────────────┐  swap   ┌────────────┐
 │ ILBondHook │ ──────▶ │ ILBond     │
 │            │ events  │ Reactive   │
@@ -183,7 +185,7 @@ export default function Home() {
           <div className="absolute inset-0 grid-bg opacity-30" />
           <h2 className="relative font-black text-balance text-3xl tracking-tight sm:text-5xl">Stop owning risk you didn't want.</h2>
           <p className="relative mx-auto mt-4 max-w-lg text-bone/55">
-            Mint your first bond on Sepolia in under a minute. Test tokens are one click away.
+            Mint your first bond on {net.name} in under a minute. Test tokens are one click away.
           </p>
           <div className="relative mt-8 flex flex-wrap justify-center gap-3">
             <Button to="/create" variant="bone" size="lg">

@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useAccount } from 'wagmi'
 import { parseUnits } from 'viem'
 import { ERC20_ABI } from '../config/contracts'
-import { getToken } from '../config/pools'
 import { usePool } from '../context/PoolContext'
+import { useNetwork } from '../context/NetworkContext'
 import { useTokenInfo } from '../hooks/reads'
 import { useTx } from '../hooks/useTx'
 import { fmtToken } from '../lib/format'
@@ -39,13 +39,14 @@ function BalanceLine({ sym, color, value, decimals, mintable, onMint, minting })
  */
 export default function Faucet({ showSelector = false, banner = false }) {
   const { pool } = usePool()
+  const net = useNetwork()
   const { address, isConnected } = useAccount()
   const { bal0, bal1, refetch } = useTokenInfo(address, pool.token0, pool.token1)
   const { run } = useTx()
   const [minting, setMinting] = useState(null)
 
-  const tok0 = getToken(pool.token0)
-  const tok1 = getToken(pool.token1)
+  const tok0 = net.getToken(pool.token0)
+  const tok1 = net.getToken(pool.token1)
   const anyMintable = tok0.mintable || tok1.mintable
 
   async function mint(token, sym, decimals) {
@@ -68,7 +69,7 @@ export default function Faucet({ showSelector = false, banner = false }) {
 
       {banner && (
         <div className="mt-3 rounded-lg border border-amber/30 bg-amber/[0.06] px-3 py-2 font-mono text-[11px] leading-relaxed text-amber/90">
-          ⚠ Test / demo / beta only — mints free test tokens for the <b>{pool.label}</b> pool on Sepolia. These are not
+          ⚠ Test / demo / beta only — mints free test tokens for the <b>{pool.label}</b> pool on {net.name}. These are not
           real assets and have no value.
         </div>
       )}

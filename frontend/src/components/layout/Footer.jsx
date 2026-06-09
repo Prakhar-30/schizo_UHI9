@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom'
 import { Mark } from './Logo'
-import { ADDR, sepoliaAddr, reactscanAddr } from '../../config/contracts'
-import { getToken } from '../../config/pools'
+import { useNetwork } from '../../context/NetworkContext'
 import { Addr, Divider } from '../ui/Bits'
 
 export default function Footer() {
+  const net = useNetwork()
   return (
     <footer className="relative mt-16 border-t-2 border-white/10 sm:mt-24">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14">
@@ -38,7 +38,7 @@ export default function Footer() {
           <div>
             <p className="kicker mb-4">Network</p>
             <ul className="space-y-2.5 text-sm text-bone/60">
-              <li>Ethereum Sepolia</li>
+              <li>{net.name}</li>
               <li>Reactive Lasna</li>
               <li className="pt-1">
                 <a className="link" href="https://reactive.network" target="_blank" rel="noreferrer">
@@ -58,19 +58,19 @@ export default function Footer() {
             <ul className="space-y-2.5 text-sm">
               <li className="flex items-center justify-between gap-2">
                 <span className="shrink-0 text-bone/45">Hook</span>
-                <Addr value={ADDR.hook} href={sepoliaAddr(ADDR.hook)} />
+                <Addr value={net.addr.hook} href={net.addrUrl(net.addr.hook)} />
               </li>
               <li className="flex items-center justify-between gap-2">
                 <span className="shrink-0 text-bone/45">Reactive</span>
-                <Addr value={ADDR.reactive} href={reactscanAddr(ADDR.reactive)} />
+                <Addr value={net.addr.reactive} href={net.reactscanUrl(net.addr.reactive)} />
               </li>
               <li className="flex items-center justify-between gap-2">
-                <span className="shrink-0 text-bone/45">{getToken(ADDR.token0).symbol}</span>
-                <Addr value={ADDR.token0} href={sepoliaAddr(ADDR.token0)} />
+                <span className="shrink-0 text-bone/45">{net.getToken(net.demoPool.token0).symbol}</span>
+                <Addr value={net.demoPool.token0} href={net.addrUrl(net.demoPool.token0)} />
               </li>
               <li className="flex items-center justify-between gap-2">
-                <span className="shrink-0 text-bone/45">{getToken(ADDR.token1).symbol}</span>
-                <Addr value={ADDR.token1} href={sepoliaAddr(ADDR.token1)} />
+                <span className="shrink-0 text-bone/45">{net.getToken(net.demoPool.token1).symbol}</span>
+                <Addr value={net.demoPool.token1} href={net.addrUrl(net.demoPool.token1)} />
               </li>
             </ul>
           </div>

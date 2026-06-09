@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useWriteContract, usePublicClient } from 'wagmi'
 import { useToast } from '../components/ui/Toast'
-import { SEPOLIA_CHAIN_ID, sepoliaTx } from '../config/contracts'
+import { useNetwork } from '../context/NetworkContext'
 
 export function parseTxError(e) {
   const raw = e?.shortMessage || e?.details || e?.message || 'Unknown error'
@@ -15,8 +15,9 @@ export function parseTxError(e) {
  * run(request, { pendingMsg, successMsg, onSuccess })
  */
 export function useTx() {
+  const net = useNetwork()
   const { writeContractAsync } = useWriteContract()
-  const publicClient = usePublicClient({ chainId: SEPOLIA_CHAIN_ID })
+  const publicClient = usePublicClient({ chainId: net.chainId })
   const { toast, dismiss } = useToast()
   const [pending, setPending] = useState(false)
 
@@ -25,22 +26,22 @@ export function useTx() {
       let toastId
       try {
         setPending(true)
-        const hash = await writeContractAsync({ chainId: SEPOLIA_CHAIN_ID, ...request })
+        const hash = await writeContractAsync({ chainId: net.chainId, ...request })
         toastId = toast({
           variant: 'pending',
           title: pendingMsg,
           desc: 'Waiting for inclusion…',
           duration: 0,
-          link: { href: sepoliaTx(hash), label: 'View tx' },
+          link: { href: net.txUrl(hash), label: 'View tx' },
         })
         const receipt = await publicClient.waitForTransactionReceipt({ hash })
         dismiss(toastId)
         if (receipt.status === 'success') {
-          toast({ variant: 'success', title: successMsg, link: { href: sepoliaTx(hash), label: 'View tx' } })
+          toast({ variant: 'success', title: successMsg, link: { href: net.txUrl(hash), label: 'View tx' } })
           await onSuccess?.(receipt)
           return receipt
         }
-        toast({ variant: 'error', title: 'Transaction reverted', link: { href: sepoliaTx(hash), label: 'View tx' } })
+        toast({ variant: 'error', title: 'Transaction reverted', link: { href: net.txUrl(hash), label: 'View tx' } })
         return null
       } catch (e) {
         if (toastId) dismiss(toastId)
@@ -51,7 +52,7 @@ export function useTx() {
         setPending(false)
       }
     },
-    [writeContractAsync, publicClient, toast, dismiss],
+    [writeContractAsync, publicClient, toast, dismiss, net],
   )
 
   return { run, pending }

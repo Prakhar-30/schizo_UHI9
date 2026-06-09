@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { POOLS } from '../config/pools'
 import { usePool } from '../context/PoolContext'
+import { useNetwork } from '../context/NetworkContext'
 import { usePoolStats, usePoolSwapSeries } from '../hooks/reads'
 import { humanPrice } from '../lib/il'
 import { fmtNum, fmtCompact } from '../lib/format'
@@ -35,6 +35,7 @@ function feeStyle(pips) {
 
 export default function Pools() {
   const navigate = useNavigate()
+  const net = useNetwork()
   const { setPoolId } = usePool()
   const { byId, isLoading } = usePoolStats()
   const { data: series, isLoading: seriesLoading } = usePoolSwapSeries()
@@ -56,7 +57,7 @@ export default function Pools() {
   }
 
   const rows = useMemo(() => {
-    const list = POOLS.map((p) => {
+    const list = net.pools.map((p) => {
       const stat = byId[p.id.toLowerCase()]
       const swaps = series?.[p.id.toLowerCase()] || []
       const swapPrices = swaps
@@ -100,7 +101,7 @@ export default function Pools() {
       }
     })
     return s
-  }, [byId, series, q, sort])
+  }, [byId, series, q, sort, net])
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">

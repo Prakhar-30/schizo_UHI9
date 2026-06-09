@@ -1,5 +1,5 @@
-import { sepoliaTx } from '../config/contracts'
 import { fmtToken, fmtBpsPct, shortAddr, timeAgo } from '../lib/format'
+import { useNetwork } from '../context/NetworkContext'
 import { Spinner } from './ui/Bits'
 
 const META = {
@@ -83,6 +83,7 @@ function describe(name, a, posById) {
 }
 
 export default function ActivityFeed({ events, isLoading, emptyLabel = 'No activity yet.', positionsById }) {
+  const net = useNetwork()
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 py-10 font-mono text-sm text-bone/40">
@@ -110,7 +111,7 @@ export default function ActivityFeed({ events, isLoading, emptyLabel = 'No activ
               </div>
             </div>
             <a
-              href={sepoliaTx(e.txHash)}
+              href={net.txUrl(e.txHash)}
               target="_blank"
               rel="noreferrer"
               className="font-mono text-[11px] text-bone/30 hover:text-volt"

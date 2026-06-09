@@ -8,6 +8,7 @@ import '@rainbow-me/rainbowkit/styles.css'
 import './index.css'
 import { config } from './config/wagmi'
 import { ToastProvider } from './components/ui/Toast'
+import { NetworkProvider } from './context/NetworkContext'
 import { PoolProvider } from './context/PoolContext'
 import App from './App'
 
@@ -29,12 +30,14 @@ createRoot(document.getElementById('root')).render(
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider theme={rkTheme} modalSize="compact">
           <ToastProvider>
-            <PoolProvider>
-              {/* HashRouter → deep-link reloads never 404 on static hosts */}
-              <HashRouter>
-                <App />
-              </HashRouter>
-            </PoolProvider>
+            <NetworkProvider>
+              <PoolProvider>
+                {/* HashRouter → deep-link reloads never 404 on static hosts */}
+                <HashRouter>
+                  <App />
+                </HashRouter>
+              </PoolProvider>
+            </NetworkProvider>
           </ToastProvider>
         </RainbowKitProvider>
       </QueryClientProvider>

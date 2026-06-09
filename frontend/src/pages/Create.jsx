@@ -2,17 +2,15 @@ import { useState, useMemo } from 'react'
 import { useAccount, usePublicClient } from 'wagmi'
 import { parseUnits, maxUint256 } from 'viem'
 import {
-  ADDR,
   HOOK_ABI,
   ERC20_ABI,
-  SEPOLIA_CHAIN_ID,
   SQRT_PRICE_1_1,
   BASE_FEE_BPS,
   TICK_LOWER,
   TICK_UPPER,
 } from '../config/contracts'
-import { getToken } from '../config/pools'
 import { usePool } from '../context/PoolContext'
+import { useNetwork } from '../context/NetworkContext'
 import { useTokenInfo, useCurrentPrice } from '../hooks/reads'
 import { useTx } from '../hooks/useTx'
 import { useToast } from '../components/ui/Toast'
@@ -37,8 +35,9 @@ function safeParse(v, decimals) {
 
 export default function Create() {
   const { pool } = usePool()
+  const net = useNetwork()
   const { address, isConnected, chainId } = useAccount()
-  const publicClient = usePublicClient({ chainId: SEPOLIA_CHAIN_ID })
+  const publicClient = usePublicClient({ chainId: net.chainId })
   const { run, pending } = useTx()
   const { toast } = useToast()
   const { bal0, bal1, refetch: refetchTokens } = useTokenInfo(address, pool.token0, pool.token1)
@@ -47,8 +46,8 @@ export default function Create() {
   const [deposit0, setDeposit0] = useState('1')
   const [premium, setPremium] = useState('0.1')
 
-  const tok0 = getToken(pool.token0)
-  const tok1 = getToken(pool.token1)
+  const tok0 = net.getToken(pool.token0)
+  const tok1 = net.getToken(pool.token1)
 
   const sqrtP = price?.sqrtPriceX96 ?? SQRT_PRICE_1_1
   // The user enters a real amount of token0 (decimal-correct). We derive the
@@ -65,7 +64,7 @@ export default function Create() {
 
   const curPrice = price ? humanPrice(price.sqrtPriceX96, pool.dec0, pool.dec1) : 0
   const enoughBal = bal0 !== undefined && bal1 !== undefined && bal0 >= max0 && bal1 >= max1
-  const wrongChain = isConnected && chainId !== SEPOLIA_CHAIN_ID
+  const wrongChain = isConnected && chainId !== net.chainId
   const valid = L > 0n && ask > 0n
   const dynFeePct = price?.dynFee ? (price.dynFee / 10000).toFixed(3) : (BASE_FEE_BPS / 100).toFixed(3)
 
@@ -74,11 +73,11 @@ export default function Create() {
       address: token,
       abi: ERC20_ABI,
       functionName: 'allowance',
-      args: [address, ADDR.hook],
+      args: [address, net.addr.hook],
     })
     if (a >= needed) return true
     return await run(
-      { address: token, abi: ERC20_ABI, functionName: 'approve', args: [ADDR.hook, maxUint256] },
+      { address: token, abi: ERC20_ABI, functionName: 'approve', args: [net.addr.hook, maxUint256] },
       { pendingMsg: `Approving ${sym}…`, successMsg: `${sym} approved` },
     )
   }
@@ -90,7 +89,7 @@ export default function Create() {
     if (!(await ensureAllowance(pool.token1, max1, tok1.symbol))) return
     await run(
       {
-        address: ADDR.hook,
+        address: net.addr.hook,
         abi: HOOK_ABI,
         functionName: 'depositILBond',
         args: [pool.key, TICK_LOWER, TICK_UPPER, L, max0, max1, ask],
@@ -124,7 +123,7 @@ export default function Create() {
       {wrongChain && (
         <div className="mb-6 flex items-center gap-3 rounded-xl border-2 border-amber/40 bg-amber/5 p-4">
           <Dot color="amber" pulse />
-          <p className="font-mono text-sm text-amber">You're on the wrong network — transactions will prompt a switch to Ethereum Sepolia.</p>
+          <p className="font-mono text-sm text-amber">You're on a different network — transactions will prompt a switch to {net.name}.</p>
         </div>
       )}
 

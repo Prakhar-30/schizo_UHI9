@@ -1,5 +1,4 @@
-import { ADDR, sepoliaAddr, reactscanAddr } from '../config/contracts'
-import { getToken } from '../config/pools'
+import { useNetwork } from '../context/NetworkContext'
 import { Card } from '../components/ui/Card'
 import { Kicker, Chip, Dot, Leg, Divider, Addr } from '../components/ui/Bits'
 import Button from '../components/ui/Button'
@@ -42,15 +41,15 @@ function Step({ i, t, d, tag }) {
   )
 }
 
-const CONTRACTS = [
-  { label: 'ILBondHook', net: 'Sepolia', addr: ADDR.hook, href: sepoliaAddr(ADDR.hook) },
-  { label: 'ILBondReactive', net: 'Lasna', addr: ADDR.reactive, href: reactscanAddr(ADDR.reactive) },
-  { label: `${getToken(ADDR.token0).symbol} (demo token0)`, net: 'Sepolia', addr: ADDR.token0, href: sepoliaAddr(ADDR.token0) },
-  { label: `${getToken(ADDR.token1).symbol} (demo token1)`, net: 'Sepolia', addr: ADDR.token1, href: sepoliaAddr(ADDR.token1) },
-  { label: 'PoolManager', net: 'Sepolia', addr: ADDR.poolManager, href: sepoliaAddr(ADDR.poolManager) },
-]
-
 export default function About() {
+  const nw = useNetwork()
+  const CONTRACTS = [
+    { label: 'ILBondHook', net: nw.short, addr: nw.addr.hook, href: nw.addrUrl(nw.addr.hook) },
+    { label: 'ILBondReactive', net: 'Lasna', addr: nw.addr.reactive, href: nw.reactscanUrl(nw.addr.reactive) },
+    { label: `${nw.getToken(nw.demoPool.token0).symbol} (demo token0)`, net: nw.short, addr: nw.demoPool.token0, href: nw.addrUrl(nw.demoPool.token0) },
+    { label: `${nw.getToken(nw.demoPool.token1).symbol} (demo token1)`, net: nw.short, addr: nw.demoPool.token1, href: nw.addrUrl(nw.demoPool.token1) },
+    { label: 'PoolManager', net: nw.short, addr: nw.addr.poolManager, href: nw.addrUrl(nw.addr.poolManager) },
+  ]
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
       {/* intro */}
@@ -104,7 +103,7 @@ export default function About() {
             <div className="border-b-2 border-white/10 p-7 md:border-b-0 md:border-r-2">
               <div className="flex items-center gap-2">
                 <Dot color="mint" />
-                <h3 className="font-bold">ILBondHook · Sepolia</h3>
+                <h3 className="font-bold">ILBondHook · {nw.short}</h3>
               </div>
               <p className="mt-3 text-sm leading-relaxed text-bone/55">
                 The v4 hook + callback contract. Holds positions, mints the two legs, takes the premium on a sale, and

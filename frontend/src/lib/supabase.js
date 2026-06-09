@@ -3,7 +3,6 @@ import { ADDR } from '../config/contracts'
 
 const URL = import.meta.env.VITE_SUPABASE_URL
 const KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
-const HOOK_ADDR = ADDR.hook.toLowerCase()
 
 // Read-only public client. Writes happen server-side in api/index-events.js with
 // the service-role key. If the env vars are missing, callers fall back to chain.
@@ -50,15 +49,16 @@ export function rowToEvent(row) {
  * Returns events in the same shape as the on-chain path. Throws on error so the
  * caller can fall back to reading logs directly.
  */
-export async function fetchEventsFromSupabase() {
+export async function fetchEventsFromSupabase(hookAddr = ADDR.hook) {
   if (!supabase) throw new Error('supabase not configured')
+  const HOOK_ADDR = hookAddr.toLowerCase()
   const PAGE = 1000
   const all = []
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from('hook_events')
       .select('*')
-      .eq('hook_address', HOOK_ADDR) // only the active deployment's events
+      .eq('hook_address', HOOK_ADDR) // hook address is unique per chain → isolates deployments
       .order('block_number', { ascending: true })
       .order('log_index', { ascending: true })
       .range(from, from + PAGE - 1)

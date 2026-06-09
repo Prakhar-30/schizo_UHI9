@@ -2,12 +2,12 @@ import { keccak256, encodeAbiParameters } from 'viem'
 import { ADDR, DYNAMIC_FEE_FLAG, TICK_SPACING } from './contracts'
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  TOKEN REGISTRY  (v2 multi-pool deployment, 2026-06-07)
-//  Keyed by lowercased address. `mintable` = our MockERC20 with public mint()
-//  → can power an in-app faucet. Real Aave Sepolia tokens are not mintable here.
+//  TOKEN REGISTRY — the Sepolia (original) deployment's 10 tokens.
+//  Other chains supply their own token list via config/networks.js. Keyed by
+//  lowercased address. `mintable` = our MockERC20 with public mint() → faucet.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const RAW_TOKENS = [
+export const SEPOLIA_RAW_TOKENS = [
   // custom (mintable)
   { address: '0x748b5C9623528D346C414F4f236B3b5b5c7683cb', symbol: 'WETH', name: 'Wrapped Ether', decimals: 18, mintable: true },
   { address: '0x912A7Fb66391eAe95DDee40B664FF497108580CD', symbol: 'WBTC', name: 'Wrapped BTC', decimals: 8, mintable: true },
@@ -22,15 +22,7 @@ const RAW_TOKENS = [
   { address: '0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0', symbol: 'USDT', name: 'Tether USD', decimals: 6, mintable: false },
 ]
 
-export const TOKENS = Object.fromEntries(RAW_TOKENS.map((t) => [t.address.toLowerCase(), t]))
-
 const UNKNOWN = { symbol: '???', name: 'Unknown token', decimals: 18, mintable: false }
-
-/** Look up token metadata by address (case-insensitive). Always returns an object. */
-export function getToken(address) {
-  if (!address) return { ...UNKNOWN, address }
-  return TOKENS[address.toLowerCase()] || { ...UNKNOWN, address }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  POOL KEY / ID
@@ -50,7 +42,7 @@ const POOL_KEY_TUPLE = [
 ]
 
 /** Build the canonical PoolKey for a token pair (currency0 < currency1 by address). */
-export function buildPoolKey(tokenA, tokenB) {
+export function buildPoolKey(tokenA, tokenB, hook = ADDR.hook) {
   const [c0, c1] =
     tokenA.toLowerCase() < tokenB.toLowerCase() ? [tokenA, tokenB] : [tokenB, tokenA]
   return {
@@ -58,7 +50,7 @@ export function buildPoolKey(tokenA, tokenB) {
     currency1: c1,
     fee: DYNAMIC_FEE_FLAG,
     tickSpacing: TICK_SPACING,
-    hooks: ADDR.hook,
+    hooks: hook,
   }
 }
 
@@ -67,25 +59,29 @@ export function poolIdFromKey(key) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  POOL REGISTRY  — every C(10,2)=45 token-pair combination, matching the
-//  on-chain FreshDeploy script (same token order). One pair is the `demo` pool
-//  (in-app faucet). Pairs are sorted to canonical currency0/1 by buildPoolKey.
+//  REGISTRY BUILDER — given a chain's token list + hook, produce every
+//  C(n,2) pair pool (matching the on-chain deploy script's token order) plus
+//  lookups. Used per-network by config/networks.js.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// The designated demo pair (both tokens mintable) — exposes the faucet.
-const DEMO_PAIR = ['WETH', 'WBTC']
-const isDemoPair = (s0, s1) =>
-  (s0 === DEMO_PAIR[0] && s1 === DEMO_PAIR[1]) || (s0 === DEMO_PAIR[1] && s1 === DEMO_PAIR[0])
+export function buildPoolRegistry({ rawTokens, hook = ADDR.hook, demoPair }) {
+  const tokens = Object.fromEntries(rawTokens.map((t) => [t.address.toLowerCase(), t]))
+  const getToken = (address) => {
+    if (!address) return { ...UNKNOWN, address }
+    return tokens[address.toLowerCase()] || { ...UNKNOWN, address }
+  }
+  const isDemoPair = (s0, s1) =>
+    !!demoPair &&
+    ((s0 === demoPair[0] && s1 === demoPair[1]) || (s0 === demoPair[1] && s1 === demoPair[0]))
 
-export const POOLS = (() => {
-  const list = []
-  for (let i = 0; i < RAW_TOKENS.length; i++) {
-    for (let j = i + 1; j < RAW_TOKENS.length; j++) {
-      const key = buildPoolKey(RAW_TOKENS[i].address, RAW_TOKENS[j].address)
+  const pools = []
+  for (let i = 0; i < rawTokens.length; i++) {
+    for (let j = i + 1; j < rawTokens.length; j++) {
+      const key = buildPoolKey(rawTokens[i].address, rawTokens[j].address, hook)
       const id = poolIdFromKey(key)
       const t0 = getToken(key.currency0)
       const t1 = getToken(key.currency1)
-      list.push({
+      pools.push({
         id,
         key,
         token0: key.currency0,
@@ -95,17 +91,31 @@ export const POOLS = (() => {
         dec0: t0.decimals,
         dec1: t1.decimals,
         label: `${t0.symbol}/${t1.symbol}`,
-        demo: isDemoPair(RAW_TOKENS[i].symbol, RAW_TOKENS[j].symbol),
+        demo: isDemoPair(rawTokens[i].symbol, rawTokens[j].symbol),
       })
     }
   }
-  return list
-})()
+  const poolsById = Object.fromEntries(pools.map((p) => [p.id.toLowerCase(), p]))
+  const demoPool = pools.find((p) => p.demo) || pools[0]
+  const getPoolById = (id) => (id ? poolsById[id.toLowerCase()] : undefined)
 
-export const POOLS_BY_ID = Object.fromEntries(POOLS.map((p) => [p.id.toLowerCase(), p]))
-
-export const DEMO_POOL = POOLS.find((p) => p.demo) || POOLS[0]
-
-export function getPoolById(id) {
-  return id ? POOLS_BY_ID[id.toLowerCase()] : undefined
+  return { tokens, getToken, pools, poolsById, demoPool, getPoolById }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Sepolia defaults (legacy/back-compat: the OG edge function + any module that
+//  imports a fixed registry). Chain-aware UI code should use useNetwork() instead.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const sepoliaRegistry = buildPoolRegistry({
+  rawTokens: SEPOLIA_RAW_TOKENS,
+  hook: ADDR.hook,
+  demoPair: ['WETH', 'WBTC'],
+})
+
+export const TOKENS = sepoliaRegistry.tokens
+export const getToken = sepoliaRegistry.getToken
+export const POOLS = sepoliaRegistry.pools
+export const POOLS_BY_ID = sepoliaRegistry.poolsById
+export const DEMO_POOL = sepoliaRegistry.demoPool
+export const getPoolById = sepoliaRegistry.getPoolById

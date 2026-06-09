@@ -10,7 +10,8 @@ import {
 } from '../hooks/reads'
 import { humanPrice } from '../lib/il'
 import { fmtToken, fmtCompact, fmtNum, fmtBpsPct, isSameAddr } from '../lib/format'
-import { ADDR, HOOK_ABI, ERC20_ABI, SEPOLIA_CHAIN_ID, sepoliaAddr, sepoliaTx } from '../config/contracts'
+import { HOOK_ABI, ERC20_ABI } from '../config/contracts'
+import { useNetwork } from '../context/NetworkContext'
 import { useTx } from '../hooks/useTx'
 import { useToast } from '../components/ui/Toast'
 import { Card } from '../components/ui/Card'
@@ -24,13 +25,13 @@ import ActivityFeed from '../components/ActivityFeed'
 import PositionChart from '../components/PositionChart'
 import OutcomeStrip from '../components/OutcomeStrip'
 
-const hookBase = { address: ADDR.hook, abi: HOOK_ABI }
-
 export default function PositionDetail() {
   const { id } = useParams()
   const positionId = Number(id)
+  const net = useNetwork()
+  const hookBase = { address: net.addr.hook, abi: HOOK_ABI }
   const { address, isConnected } = useAccount()
-  const publicClient = usePublicClient({ chainId: SEPOLIA_CHAIN_ID })
+  const publicClient = usePublicClient({ chainId: net.chainId })
   const { run, pending } = useTx()
   const { toast } = useToast()
 
@@ -97,7 +98,7 @@ export default function PositionDetail() {
   const dec1 = position.pool?.dec1 ?? 18
   const premSym = position.premiumSym || 'token1'
   const premDec = position.premiumDec ?? 18
-  const premiumToken = position.premiumToken || ADDR.token1
+  const premiumToken = position.premiumToken || net.demoPool.token1
   const pairLabel = position.pool?.label || 'pair'
 
   const entryPrice = humanPrice(entrySqrtPriceX96, dec0, dec1)
@@ -109,11 +110,11 @@ export default function PositionDetail() {
       address: premiumToken,
       abi: ERC20_ABI,
       functionName: 'allowance',
-      args: [address, ADDR.hook],
+      args: [address, net.addr.hook],
     })
     if (allowance < askPremium) {
       const ok = await run(
-        { address: premiumToken, abi: ERC20_ABI, functionName: 'approve', args: [ADDR.hook, maxUint256] },
+        { address: premiumToken, abi: ERC20_ABI, functionName: 'approve', args: [net.addr.hook, maxUint256] },
         { pendingMsg: `Approving ${premSym}…`, successMsg: `${premSym} approved` },
       )
       if (!ok) return
@@ -315,7 +316,7 @@ export default function PositionDetail() {
               <Kicker>Receipts</Kicker>
               <div className="mt-3 space-y-2 font-mono text-xs">
                 <a
-                  href={sepoliaTx(history.created.txHash)}
+                  href={net.txUrl(history.created.txHash)}
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-center justify-between gap-2 text-bone/60 hover:text-volt"
@@ -325,7 +326,7 @@ export default function PositionDetail() {
                 </a>
                 {history.sold && (
                   <a
-                    href={sepoliaTx(history.sold.txHash)}
+                    href={net.txUrl(history.sold.txHash)}
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-center justify-between gap-2 text-bone/60 hover:text-volt"
@@ -372,7 +373,7 @@ function Row({ label, leg, value, mine }) {
       {leg ? <Leg kind={leg} /> : <span className="font-mono text-xs uppercase tracking-wider text-bone/50">{label}</span>}
       <div className="flex items-center gap-2">
         {mine && <span className="font-mono text-[10px] uppercase tracking-wider text-volt">you</span>}
-        <Addr value={value} href={sepoliaAddr(value)} />
+        <Addr value={value} href={net.addrUrl(value)} />
       </div>
     </div>
   )

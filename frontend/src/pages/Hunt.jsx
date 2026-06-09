@@ -3,10 +3,10 @@ import { useAccount, usePublicClient } from 'wagmi'
 import { Link } from 'react-router-dom'
 import { maxUint256 } from 'viem'
 import { usePositions, useHookCounters, useReactiveStatus } from '../hooks/reads'
-import { POOLS } from '../config/pools'
 import OutcomeStrip from '../components/OutcomeStrip'
 import { fmtToken, fmtCompact, isSameAddr } from '../lib/format'
-import { ADDR, HOOK_ABI, ERC20_ABI, SEPOLIA_CHAIN_ID, sepoliaAddr } from '../config/contracts'
+import { HOOK_ABI, ERC20_ABI } from '../config/contracts'
+import { useNetwork } from '../context/NetworkContext'
 import { useTx } from '../hooks/useTx'
 import { Card } from '../components/ui/Card'
 import { Kicker, Chip, Dot, Leg, Addr, Spinner } from '../components/ui/Bits'
@@ -24,9 +24,8 @@ const SORTS = [
   { key: 'newest', label: 'Newest position' },
 ]
 
-const hookBase = { address: ADDR.hook, abi: HOOK_ABI }
-
 function HuntRow({ position, marked, busyId, onBuy }) {
+  const net = useNetwork()
   const { id, lp, askPremium, ilMarkBps, liveIlBps, liquidity, entrySqrtPriceX96 } = position
   const busy = busyId === id
   const [open, setOpen] = useState(false)
@@ -61,7 +60,7 @@ function HuntRow({ position, marked, busyId, onBuy }) {
           </div>
           <div className="col-span-2 min-w-0 sm:col-span-1">
             <p className="kicker">Listed by</p>
-            <Addr value={lp} href={sepoliaAddr(lp)} className="mt-0.5" />
+            <Addr value={lp} href={net.addrUrl(lp)} className="mt-0.5" />
           </div>
         </div>
 
@@ -99,8 +98,10 @@ function HuntRow({ position, marked, busyId, onBuy }) {
 }
 
 export default function Hunt() {
+  const net = useNetwork()
+  const hookBase = { address: net.addr.hook, abi: HOOK_ABI }
   const { address, isConnected } = useAccount()
-  const publicClient = usePublicClient({ chainId: SEPOLIA_CHAIN_ID })
+  const publicClient = usePublicClient({ chainId: net.chainId })
   const { positions, isLoading, refetch } = usePositions()
   const { nextId, activeCount, bundles } = useHookCounters()
   const rsc = useReactiveStatus()
@@ -156,17 +157,17 @@ export default function Hunt() {
     if (!isConnected) return
     setBusyId(position.id)
     try {
-      const premiumToken = position.premiumToken || ADDR.token1
+      const premiumToken = position.premiumToken || net.demoPool.token1
       const premSym = position.premiumSym || 'token1'
       const allowance = await publicClient.readContract({
         address: premiumToken,
         abi: ERC20_ABI,
         functionName: 'allowance',
-        args: [address, ADDR.hook],
+        args: [address, net.addr.hook],
       })
       if (allowance < position.askPremium) {
         const ok = await run(
-          { address: premiumToken, abi: ERC20_ABI, functionName: 'approve', args: [ADDR.hook, maxUint256] },
+          { address: premiumToken, abi: ERC20_ABI, functionName: 'approve', args: [net.addr.hook, maxUint256] },
           { pendingMsg: `Approving ${premSym}…`, successMsg: `${premSym} approved` },
         )
         if (!ok) return
@@ -215,7 +216,7 @@ export default function Hunt() {
           accent="amber"
         />
         <Stat label="Active bonds" value={activeCount !== undefined ? activeCount.toString() : '—'} accent="yield" />
-        <Stat label="Pools" value={POOLS.length.toString()} sub="dynamic-fee markets" accent="mint" />
+        <Stat label="Pools" value={net.pools.length.toString()} sub="dynamic-fee markets" accent="mint" />
         <Stat
           label="RSC marks posted"
           value={bundles !== undefined ? bundles.toString() : '—'}

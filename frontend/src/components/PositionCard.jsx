@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAccount, usePublicClient } from 'wagmi'
 import { maxUint256, isAddress } from 'viem'
-import { ADDR, HOOK_ABI, ERC20_ABI, SEPOLIA_CHAIN_ID, sepoliaAddr } from '../config/contracts'
+import { HOOK_ABI, ERC20_ABI } from '../config/contracts'
+import { useNetwork } from '../context/NetworkContext'
 import { useTx } from '../hooks/useTx'
 import { useToast } from './ui/Toast'
 import { fmtToken, fmtCompact } from '../lib/format'
@@ -14,15 +15,14 @@ import Button from './ui/Button'
 import Modal from './ui/Modal'
 import ILGauge from './ILGauge'
 
-const hookBase = { address: ADDR.hook, abi: HOOK_ABI }
-
 function HolderRow({ kind, label, holder, mine }) {
+  const net = useNetwork()
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 py-2">
       <Leg kind={kind} />
       <div className="flex items-center gap-2">
         {mine && <span className="font-mono text-[10px] uppercase tracking-wider text-volt">you</span>}
-        <Addr value={holder} href={sepoliaAddr(holder)} />
+        <Addr value={holder} href={net.addrUrl(holder)} />
       </div>
     </div>
   )
@@ -30,13 +30,15 @@ function HolderRow({ kind, label, holder, mine }) {
 
 export default function PositionCard({ position, marked = true, onAction }) {
   const { id, lp, feeHolder, ilHolder, active, ilBondSold, liquidity, ilMarkBps, liveIlBps, markValue, askPremium } = position
+  const net = useNetwork()
+  const hookBase = { address: net.addr.hook, abi: HOOK_ABI }
   const premSym = position.premiumSym || 'token1'
   const premDec = position.premiumDec ?? 18
-  const premiumToken = position.premiumToken || ADDR.token1
+  const premiumToken = position.premiumToken || net.demoPool.token1
   // Prefer the live (pool-price) mark; fall back to the last on-chain RSC mark.
   const displayIlBps = liveIlBps !== undefined ? liveIlBps : ilMarkBps
   const { address, isConnected } = useAccount()
-  const publicClient = usePublicClient({ chainId: SEPOLIA_CHAIN_ID })
+  const publicClient = usePublicClient({ chainId: net.chainId })
   const { run, pending } = useTx()
   const { toast } = useToast()
   const [transfer, setTransfer] = useState(null) // 'fee' | 'il' | null
@@ -54,11 +56,11 @@ export default function PositionCard({ position, marked = true, onAction }) {
       address: premiumToken,
       abi: ERC20_ABI,
       functionName: 'allowance',
-      args: [address, ADDR.hook],
+      args: [address, net.addr.hook],
     })
     if (allowance < askPremium) {
       const ok = await run(
-        { address: premiumToken, abi: ERC20_ABI, functionName: 'approve', args: [ADDR.hook, maxUint256] },
+        { address: premiumToken, abi: ERC20_ABI, functionName: 'approve', args: [net.addr.hook, maxUint256] },
         { pendingMsg: `Approving ${premSym}…`, successMsg: `${premSym} approved` },
       )
       if (!ok) return

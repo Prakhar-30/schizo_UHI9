@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useAccount } from 'wagmi'
-import { ADDR, HOOK_ABI } from '../config/contracts'
+import { HOOK_ABI } from '../config/contracts'
+import { useNetwork } from '../context/NetworkContext'
 import { usePositions, useClaimable, useHookCounters } from '../hooks/reads'
 import { useTx } from '../hooks/useTx'
 import { isSameAddr, fmtToken, shortAddr } from '../lib/format'
@@ -21,7 +22,7 @@ function ConnectGate() {
           <Mark size={48} />
         </div>
         <h1 className="mt-5 font-black text-2xl tracking-tight">Your dashboard</h1>
-        <p className="mt-2 text-sm text-bone/55">Connect a wallet on Ethereum Sepolia to see your bonds, legs, and claimable balances.</p>
+        <p className="mt-2 text-sm text-bone/55">Connect a wallet on a supported network to see your bonds, legs, and claimable balances.</p>
         <div className="mt-6 flex justify-center">
           <WalletButton size="lg" />
         </div>
@@ -31,6 +32,7 @@ function ConnectGate() {
 }
 
 export default function Dashboard() {
+  const net = useNetwork()
   const { address, isConnected } = useAccount()
   const { positions, refetch: refetchPositions } = usePositions()
   const { claims, refetch: refetchClaims } = useClaimable(address)
@@ -62,7 +64,7 @@ export default function Dashboard() {
 
   async function withdraw(token, sym) {
     await run(
-      { address: ADDR.hook, abi: HOOK_ABI, functionName: 'withdraw', args: [token] },
+      { address: net.addr.hook, abi: HOOK_ABI, functionName: 'withdraw', args: [token] },
       { pendingMsg: `Claiming ${sym}…`, successMsg: `${sym} claimed to your wallet`, onSuccess: () => { refetchClaims() } },
     )
   }
@@ -75,7 +77,7 @@ export default function Dashboard() {
         <div className="min-w-0">
           <Kicker>Dashboard</Kicker>
           <h1 className="mt-2 font-black text-3xl tracking-tight sm:text-5xl">Your positions</h1>
-          <p className="mt-2 font-mono text-xs text-bone/45 sm:text-sm">{shortAddr(address)} · Ethereum Sepolia</p>
+          <p className="mt-2 font-mono text-xs text-bone/45 sm:text-sm">{shortAddr(address)} · {net.name}</p>
         </div>
         <Button to="/create" variant="bone" size="md">
           + New bond

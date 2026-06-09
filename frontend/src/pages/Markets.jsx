@@ -1,8 +1,7 @@
 import { useMemo } from 'react'
 import { usePositions, useHookCounters, useReactiveStatus } from '../hooks/reads'
-import { POOLS } from '../config/pools'
+import { useNetwork } from '../context/NetworkContext'
 import { fmtBpsPct } from '../lib/format'
-import { ADDR, reactscanAddr } from '../config/contracts'
 import Stat from '../components/ui/Stat'
 import { Card } from '../components/ui/Card'
 import { Kicker, Dot, SectionHead, Spinner } from '../components/ui/Bits'
@@ -10,6 +9,7 @@ import PositionCard from '../components/PositionCard'
 import Faucet from '../components/Faucet'
 
 export default function Markets() {
+  const net = useNetwork()
   const { positions, isLoading, refetch: refetchPositions } = usePositions()
   const { nextId, activeCount, bundles } = useHookCounters()
   const rsc = useReactiveStatus()
@@ -37,7 +37,7 @@ export default function Markets() {
           </p>
         </div>
         <a
-          href={reactscanAddr(ADDR.reactive)}
+          href={net.reactscanUrl(net.addr.reactive)}
           target="_blank"
           rel="noreferrer"
           className="card-flat flex items-center gap-3 px-4 py-3"
@@ -58,7 +58,7 @@ export default function Markets() {
         <Stat label="Positions minted" value={nextId !== undefined ? nextId.toString() : '—'} loading={nextId === undefined} />
         <Stat label="Active bonds" value={activeCount !== undefined ? activeCount.toString() : '—'} accent="yield" loading={activeCount === undefined} />
         <Stat label="RSC data bundles" value={bundles !== undefined ? bundles.toString() : '—'} accent="volt" loading={bundles === undefined} />
-        <Stat label="Pools" value={POOLS.length.toString()} sub="dynamic-fee markets" accent="mint" />
+        <Stat label="Pools" value={net.pools.length.toString()} sub="dynamic-fee markets" accent="mint" />
         <Stat
           label="Avg IL (sold)"
           value={activeSold.length ? fmtBpsPct(avgIL) : '—'}

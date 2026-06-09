@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useAccount, usePublicClient } from 'wagmi'
 import { parseUnits, formatUnits, maxUint256 } from 'viem'
-import { ADDR, ERC20_ABI, SWAP_ROUTER_ABI, SEPOLIA_CHAIN_ID } from '../config/contracts'
+import { ERC20_ABI, SWAP_ROUTER_ABI } from '../config/contracts'
 import { usePool } from '../context/PoolContext'
+import { useNetwork } from '../context/NetworkContext'
 import { useTokenInfo, useCurrentPrice } from '../hooks/reads'
 import { useTx } from '../hooks/useTx'
 import { useToast } from './ui/Toast'
@@ -28,8 +29,9 @@ function safeParse(v, decimals) {
 
 export default function SwapPanel({ onSwapped }) {
   const { pool } = usePool()
+  const net = useNetwork()
   const { address, isConnected } = useAccount()
-  const publicClient = usePublicClient({ chainId: SEPOLIA_CHAIN_ID })
+  const publicClient = usePublicClient({ chainId: net.chainId })
   const { run, pending } = useTx()
   const { toast } = useToast()
   const { bal0, bal1, refetch } = useTokenInfo(address, pool.token0, pool.token1)
@@ -97,11 +99,11 @@ export default function SwapPanel({ onSwapped }) {
       address: tokenIn,
       abi: ERC20_ABI,
       functionName: 'allowance',
-      args: [address, ADDR.swapRouter],
+      args: [address, net.addr.swapRouter],
     })
     if (allowance >= amountIn) return true
     return await run(
-      { address: tokenIn, abi: ERC20_ABI, functionName: 'approve', args: [ADDR.swapRouter, maxUint256] },
+      { address: tokenIn, abi: ERC20_ABI, functionName: 'approve', args: [net.addr.swapRouter, maxUint256] },
       { pendingMsg: `Approving ${symIn}…`, successMsg: `${symIn} approved` },
     )
   }
@@ -114,7 +116,7 @@ export default function SwapPanel({ onSwapped }) {
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600)
     await run(
       {
-        address: ADDR.swapRouter,
+        address: net.addr.swapRouter,
         abi: SWAP_ROUTER_ABI,
         functionName: 'swapExactTokensForTokens',
         args: [amountIn, amountOutMin, zeroForOne, pool.key, '0x', address, deadline],

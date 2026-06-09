@@ -1,7 +1,7 @@
 import { useAccount } from 'wagmi'
 import { useLeaderboardData, useHookCounters } from '../hooks/reads'
+import { useNetwork } from '../context/NetworkContext'
 import { fmtToken, isSameAddr, shortAddr } from '../lib/format'
-import { sepoliaAddr } from '../config/contracts'
 import { Card } from '../components/ui/Card'
 import { Kicker, Chip, Spinner, Addr } from '../components/ui/Bits'
 import Stat from '../components/ui/Stat'
@@ -10,6 +10,7 @@ const MEDAL = ['🥇', '🥈', '🥉']
 
 function Board({ title, sub, accent, rows, formatValue, valueLabel, emptyLabel }) {
   const { address } = useAccount()
+  const net = useNetwork()
   return (
     <Card className="p-5 sm:p-6">
       <div className="flex items-baseline justify-between gap-2">
@@ -38,7 +39,7 @@ function Board({ title, sub, accent, rows, formatValue, valueLabel, emptyLabel }
                     {i < 3 ? MEDAL[i] : <span className="text-bone/40">{i + 1}</span>}
                   </span>
                   <div className="min-w-0">
-                    <Addr value={r.address} href={sepoliaAddr(r.address)} />
+                    <Addr value={r.address} href={net.addrUrl(r.address)} />
                     {mine && (
                       <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-volt">you</span>
                     )}
