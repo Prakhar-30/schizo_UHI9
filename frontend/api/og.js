@@ -324,7 +324,7 @@ export default async function handler(req) {
           box({ width: 10, height: 10, background: C.mint, borderRadius: '50%' }),
           box(
             { fontSize: 18, color: C.mute, letterSpacing: '0.2em', textTransform: 'uppercase' },
-            'Sepolia · marked by RSC',
+            (cfg.chain?.name || 'Sepolia') + ' · marked by RSC',
           ),
         ),
       ),
