@@ -318,16 +318,23 @@ export function useActivity({ limit = 50, positionId } = {}) {
         (e) => e.args?.positionId !== undefined && Number(e.args.positionId) === want,
       )
     }
-    return [...arr]
+    const sorted = [...arr]
       .sort((a, b) =>
         a.blockNumber === b.blockNumber
           ? Number(a.logIndex - b.logIndex)
           : Number(a.blockNumber - b.blockNumber),
       )
-      .slice(-limit)
-      .reverse()
+      .reverse() // newest first
+    // limit === null/undefined → return the full history (no cap)
+    return limit != null && Number.isFinite(limit) ? sorted.slice(0, limit) : sorted
   }, [r.data, limit, positionId])
-  return { data: events, isLoading: r.isLoading, refetch: r.refetch, dataUpdatedAt: r.dataUpdatedAt }
+  return {
+    data: events,
+    isLoading: r.isLoading,
+    isFetching: r.isFetching,
+    refetch: r.refetch,
+    dataUpdatedAt: r.dataUpdatedAt,
+  }
 }
 
 // ── per-position history: IL marks + swaps + creation/sale events ───────────
