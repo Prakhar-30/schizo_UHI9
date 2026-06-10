@@ -6,92 +6,92 @@ Live: https://schizo-il-bond.vercel.app · UHI9 (Theme: Impermanent Loss) · Uni
 
 ---
 
-## The one idea
+## Why this project was needed
 
-When you provide liquidity, you're forced to hold two things at once:
+Impermanent loss is the single biggest reason capital doesn't stay in AMMs. But look at what an LP position actually *is*: two opposite exposures forced into one token.
 
-- **Fee income** — boring, steady, grows with volume.
-- **Impermanent loss** — the bill you pay when price moves.
+- **Fee income** — steady, grows with volume, vol-positive.
+- **Impermanent loss** — the bill when price moves, vol-negative.
 
-Nobody asked for them bundled. The DAO treasury that wants yield doesn't want the price risk. The trader who wants to bet on volatility doesn't want to babysit a position. But Uniswap hands everyone the same package, take it or leave it.
+These attract completely different people. A DAO treasury or a stablecoin desk wants the yield and would happily pay to never touch the price risk. A volatility trader wants exactly that price risk and has no interest in babysitting an LP. Yet Uniswap forces both into the identical bundle — so the treasury sits out (too risky) and the trader sits out (too much overhead). Liquidity that *should* exist never shows up.
 
-Every IL hook built so far tries to *shrink* the IL bill — dynamic fees, rebalancing, insurance pools, LVR auctions. We do something nobody else has: we **cut the position in half and let the two halves trade separately.**
+The entire IL field so far has tried to **shrink** the bill — dynamic fees, rebalancing, insurance pools, LVR auctions. That's treating a symptom. The real problem is that **the risk can't be moved to the person who wants it.** Nobody had built the market.
 
-Deposit into schizō and your position splits into two claims:
+**schizō builds it.** At deposit, the position splits into two transferable claims:
 
-- **FEE-T** — keeps the fees and an upfront premium. Zero price risk.
-- **IL-T** — takes the impermanent loss, for or against. Pays the premium to get it.
+| | holds | price risk | for |
+|---|---|---|---|
+| **FEE-T** | swap fees **+** upfront premium | **none** | yield seekers, treasuries, passive LPs |
+| **IL-T** | the impermanent-loss P&L (for or against) | **all of it** | volatility traders, hedgers, speculators |
 
-Both are transferable. Hold both and you're a normal LP. Sell IL-T and you're earning yield with the risk handed off. Sell FEE-T and you've got a pure, leveraged bet on volatility. One deposit, two instruments, two audiences.
+IL stops being a uniform tax on LP capital and becomes a **priced, tradable instrument**. That's the difference between tranching a bond and inventing the credit-default swap.
 
-IL stops being a tax. It becomes something you can price, buy, and sell.
+## Who it's for
 
----
+- **LPs who want yield, not exposure** — DAO treasuries, stablecoin desks, conservative LPs. Mint, sell IL-T, collect fees + premium with the price risk gone.
+- **Volatility traders** — buy IL-T for a cheap, capital-efficient, *leveraged* bet on divergence. Sell FEE-T too and it's a pure vol position with no fee drag.
+- **Hedgers** — anyone with offsetting AMM exposure who wants to lay off (or take on) IL directly instead of through a clunky options wrapper.
+- **Uniswap itself** — deeper liquidity, because capital that previously refused the bundle can now hold exactly the half it wants.
 
-## Why it needs Reactive
+## What it does (the working)
 
-The hard part isn't the split — it's keeping the IL leg *honest*. IL is a function of price, and price only moves on swaps. So the mark needs to update on every swap, against each position's entry price, without a keeper sitting on a timer burning gas for nothing.
+1. **Deposit.** An LP calls `depositILBond` with a pool, range, and an asking premium. The hook pulls tokens, mints **real full-range v4 liquidity** through `unlock`/`modifyLiquidity` (salt = positionId), refunds the dust, and issues **FEE-T + IL-T** to the LP.
+2. **Sell the risk.** A buyer calls `buyILBond`, paying the premium in the pool's quote token. IL-T transfers to them; the premium is credited to whoever currently holds FEE-T. Bilateral — no insurance pool, no protocol float.
+3. **Mark, on every swap.** Any swap emits `SwapOccurred`. A Reactive Smart Contract reacts, pulls a bundle of every open position at *its own pool's* live price, computes `IL = 1 − 2√r/(1+r)` in the ReactVM, and writes the mark back on-chain. No keeper, no cron — the mark moves exactly when price moves.
+4. **Exit & settle.** Any party can exit. Liquidity is removed and the underlying is credited to the IL-T holder (they bear the composition — that *is* the IL); everyone withdraws their own balance per token.
 
-That's exactly what a Reactive Smart Contract is for. Ours subscribes to the hook's swap events on Sepolia and runs the whole loop itself:
+Pools also charge a **genuinely dynamic fee**: `0.30% + f(realized volatility)`, capped at 3%, from an on-chain EWMA of tick movement — LPs get paid more precisely when IL risk is highest.
+
+## The complexity of the architecture
+
+This is a three-layer, cross-chain system held together by one event loop — not a single contract.
 
 ```
-swap on any pool
-  → hook emits SwapOccurred
-     → RSC reacts, asks the hook for a data bundle
-        → hook emits every active position + its pool's live price
-           → RSC computes IL = 1 − 2√r/(1+r) inside the ReactVM
-              → RSC calls back settleILMark(id, ilBps) on the hook
+SETTLEMENT (Uniswap v4)        BRAINS (Reactive Network)        PRODUCT (backend + app)
+Sepolia / Unichain Sepolia     Reactive Lasna · ReactVM         Vercel + Supabase + React
+ILBondHook + PoolManager  ──▶  ILBondReactive (1 per chain) ──▶ indexer → Supabase → frontend
+  afterSwap: SwapOccurred         on swap → ask for bundle         backend-first reads
+  prepareILBondData (callback)    compute IL per position          per-chain registry
+  settleILMark (callback)         settleILMark back                live OG share cards
 ```
 
-No cron. No off-chain bot. No trust. The mark moves exactly when reality moves — which is the only time it should. The swap path stays cheap because the math lives on Reactive, not in `beforeSwap`. This product simply does not exist without it.
+The hard parts that make it more than a demo:
 
----
+- **The mark can't live on the swap path.** Doing IL math in `beforeSwap`/`afterSwap` taxes every trade; a keeper burns gas on a timer and must be trusted. The RSC fires on the swap event itself — the exact, and only, moment IL changes — and computes it cheaply off the hot path. The two-phase relay (`prepareILBondData → ILBondDataBundle → settleILMark`) is native to Reactive and awkward-to-impossible anywhere else.
+- **Multi-pool correctness.** The bundle carries a **per-position** `currentSqrtPriceX96` read from each position's own pool, so a WBTC/WETH swap never mismarks a LINK/UNI position. The RSC struct, the hook struct, and the frontend decoder mirror the layout exactly.
+- **An overflow that would have bricked it.** `sqrtR²` overflows uint256 at extreme divergence; without a guard the whole bundle reverts and *no* position gets marked. A saturation guard returns the correct −100% instead. Caught by the fuzz suite.
+- **Decimal-correct across 2/6/8/18.** 45 pools across 10 tokens. Prices render as `raw · 10^(dec0−dec1)`; deposits are entered as real token amounts and `L` is derived — an 8-decimal pool never asks for a million tokens.
+- **A backend that earns its keep.** Public RPCs cap `getLogs` to ~9,500 blocks. A multi-chain Supabase indexer ingests the full history (recovering each position's poolId from `PoolManager.ModifyLiquidity`, since `PositionCreated` doesn't carry it), so charts/feeds/leaderboards are complete and fast, with on-chain reads only as a fallback.
+- **Deployed twice, independently.** The same system runs on Ethereum Sepolia *and* Unichain Sepolia — separate hooks, separate RSCs, separate tokens — with the frontend switching every address by the connected wallet's chain.
+
+## What was used, why, and how it helped
+
+| Used | Why | Benefit |
+|------|-----|---------|
+| **Uniswap v4 hooks** | `beforeSwap`/`afterSwap` are the only place to inject dynamic fees and emit price truth at the source | real liquidity + settlement for free; the split rides on actual v4 positions, not a synthetic wrapper |
+| **Reactive Network (RSC on Lasna)** | IL must be re-marked on *every* swap, per position, trustlessly and off the hot path | no keeper, no cron, no trust; swaps stay cheap; the IL leg stays honest automatically — the product can't exist without it |
+| **ReactVM fixed-point IL math** | run `1 − 2√r/(1+r)` where it's nearly free and externally auditable | accurate, gas-light marks; overflow-guarded over the full price range |
+| **Supabase + serverless indexer** | RPC log windows are too short for full history; charts must not freeze | complete, fast, backend-first data; multi-chain, RLS-protected, deployment-isolated by `hook_address` |
+| **React + wagmi/viem + RainbowKit** | a real product, not a script | chain-aware UX: connect a wallet and the whole app reconfigures to that chain |
+| **Foundry (fuzz + invariant)** | a financial primitive must be provably safe | **74 passing tests** — lifecycle, access control, dynamic fee, multi-pool, solvency, and the IL math fuzzed across the entire sqrt-price range |
 
 ## It's real, and it's running
 
-This isn't a slide deck. The whole system is deployed and live — and it runs on **two chains independently**, with the frontend switching every address by the connected wallet's chain.
+Not a slide deck. Live on **two chains**, end to end:
 
-| | Ethereum Sepolia | Unichain Sepolia |
-|---|---|---|
-| ILBondHook | `0x58A3A816864F1E5f6F38F01f9f5AE1Cacc9210C0` | `0x56B99A42E41D5987b2F39E97F3EBe5f3d76e10C0` |
-| ILBondReactive (Lasna) | `0x27eab090BF647e191A4FB121A780aA6ED89C53E2` | `0x4F193c807b4BD93054332bc67e64428725AA107D` |
-| Pools | 45 pairs (10 tokens, 2/6/8/18 decimals) | 3 pairs (mWETH/mWBTC/mUSDC) |
-
-Frontend: https://schizo-il-bond.vercel.app
-
-What works today:
-- LPs mint FEE-T + IL-T from a real full-range v4 deposit, decimal-correct across every pool.
-- A second wallet buys the IL-T leg, premium paid bilaterally — no insurance pool, no protocol float.
-- The RSC marks every open position to its **own pool's** price on every swap, and the dashboard shows it live.
-- **Dynamic fees that actually move**: each pool charges `0.30% + f(realized volatility)`, capped at 3%, driven by an on-chain EWMA of tick movement — verified climbing under load and decaying when calm.
-
----
-
-## The dynamic fee, briefly
-
-The "dynamic" in most dynamic-fee demos is a constant in disguise. Ours isn't. `beforeSwap` reads a per-pool volatility EWMA and charges `BASE_FEE + volEwma / sensitivity`, clamped at the cap. Calm pool → 0.30%. Choppy pool → it ratchets up automatically and relaxes back down as things settle. Liquidity providers get paid more precisely when their IL risk is highest.
-
----
-
-## Why this is a category, not a feature
-
-- **vs IL-protection hooks** — they keep the LP holding the risk and try to soften it. We let the LP *get rid of it* to someone who wants it.
-- **vs options-on-LP** — those write derivatives *next to* a position. IL-T isn't a derivative; it **is** a slice of the position itself.
-- **vs insurance hooks** — those need a capital pool to pay claims. We need nothing but a willing counterparty and an upfront premium. Fully bilateral.
-
-The closest prior art (UHI3's fixed/leverage yield) split the *upside*. We split the *downside* — the actual risk. That's the difference between tranching a bond and inventing the credit-default swap.
-
----
+- LPs mint FEE-T + IL-T from real v4 deposits, decimal-correct across every pool.
+- A second wallet buys the IL-T leg; the premium is paid bilaterally.
+- The RSC marks every open position to its own pool's price on every swap — observable live (the on-chain bundle counter ticks up one-for-one with swaps).
+- Dynamic fees verified climbing under load and decaying when calm.
+- **74 passing Foundry tests**, including fuzz and invariant suites.
 
 ## Where it goes
 
-- **Tranche IL-T** — a senior leg that eats the first 5% of IL, a junior leg that eats the rest. Two risk-adjusted yields from one position.
-- **Cross-pool IL netting** — the RSC already sees every pool. Let one user mint a single IL-T against their *net* exposure across correlated pools.
-- **Vol-priced premiums** — quote the premium off the live volatility EWMA the hook already tracks.
+- **Tranche IL-T** — a senior leg eating the first 5% of IL, a junior leg eating the rest: two risk-adjusted yields from one position.
+- **Vol-priced premiums** — quote the premium straight off the volatility EWMA the hook already tracks, turning the manual ask into a self-pricing market.
+- **Cross-pool IL netting** — the RSC already sees every pool; let one IL-T cover a user's *net* exposure across correlated pools.
 - **IL futures** — a dated IL-T: pure speculation on next-epoch IL versus a strike.
 
 ---
 
-Built end-to-end: Solidity hook + Reactive contract, a Supabase event index for full history, and a production React app — backed by **74 passing Foundry tests** including fuzz and invariant suites.
-
-*schizō — built for UHI9. Uniswap v4 for settlement, Reactive Network for the brains.*
+*schizō — built for UHI9. Uniswap v4 for settlement, Reactive Network for the brains. Testnet only — not financial advice.*
