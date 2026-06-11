@@ -151,7 +151,6 @@ ILBOND_PITCH.md           # the pitch
 ILBOND_REPORT.md          # full technical report
 ```
 
-> **Forked from the Uniswap [`v4-template`](https://github.com/uniswapfoundation/v4-template).** That template is the official starting point for designing and building v4 hooks; its scaffolding (PoolManager / PositionManager wiring, `HookMiner` salt-mining, test utils) was the base, then built out into the ILBondHook system. The `Counter.sol` / `Counter.t.sol` files are the template's original example, left in place.
 
 ### Prerequisites
 
