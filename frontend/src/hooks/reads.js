@@ -261,18 +261,40 @@ export function usePoolSwapSeries() {
   return { data: byPool, isLoading: r.isLoading, refetch: r.refetch }
 }
 
-// ── on-chain fallback: events within the ~9500-block public-RPC window ───────
-async function fetchEventsOnChain(net) {
+// Resolve block timestamps with bounded concurrency + best-effort: a single RPC
+// hiccup must never reject the whole feed (the old Promise.all-over-every-block
+// burst rate-limited public RPCs intermittently → empty feed).
+async function blockTimestamps(client, blockNumbers, concurrency = 6) {
+  const tsMap = {}
+  let i = 0
+  const worker = async () => {
+    while (i < blockNumbers.length) {
+      const bn = blockNumbers[i++]
+      try {
+        const b = await client.getBlock({ blockNumber: bn })
+        tsMap[bn.toString()] = Number(b.timestamp)
+      } catch {
+        /* leave undefined; consumers tolerate a missing ts */
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, blockNumbers.length) }, worker))
+  return tsMap
+}
+
+// On-chain hook events from `fromBlock` (clamped to the ~9500-block public-RPC
+// window) to head. Used for the RECENT tail the indexer hasn't reached yet.
+async function fetchEventsOnChain(net, fromBlock) {
   const client = logClientFor(net)
   const latest = await client.getBlockNumber()
-  const from = latest > LOG_LOOKBACK ? latest - LOG_LOOKBACK : 0n
+  const floor = latest > LOG_LOOKBACK ? latest - LOG_LOOKBACK : 0n
+  const from = fromBlock != null && fromBlock > floor ? fromBlock : floor
+  if (from > latest) return []
   const raw = await client.getLogs({ address: net.addr.hook, fromBlock: from, toBlock: 'latest' })
   const decoded = parseEventLogs({ abi: HOOK_ABI, logs: raw })
 
   const uniqueBlocks = [...new Set(decoded.map((l) => l.blockNumber))]
-  const blocks = await Promise.all(uniqueBlocks.map((bn) => client.getBlock({ blockNumber: bn })))
-  const tsMap = {}
-  blocks.forEach((b) => (tsMap[b.number.toString()] = Number(b.timestamp)))
+  const tsMap = await blockTimestamps(client, uniqueBlocks)
 
   return decoded.map((l) => ({
     key: `${l.transactionHash}-${l.logIndex}`,
@@ -285,23 +307,44 @@ async function fetchEventsOnChain(net) {
   }))
 }
 
-// ── all hook events (full history) — Supabase-first, on-chain fallback ───────
+// Merge two event lists, de-duping by `key` (txHash-logIndex). Same log from
+// either source is identical, so last-writer-wins is fine.
+function mergeEvents(...lists) {
+  const seen = new Map()
+  for (const list of lists) for (const e of list) seen.set(e.key, e)
+  return [...seen.values()]
+}
+
+// ── all hook events — Supabase history + live on-chain tail, merged ──────────
+// Supabase holds the full backlog (no 9500-block cap) but lags head (the indexer
+// only catches up on nudge/cron). So we ALWAYS also read the recent on-chain tail
+// — just the blocks past Supabase's high-water mark — and merge, so freshly
+// emitted events appear immediately regardless of indexer lag.
 export function useAllEvents() {
   const net = useNetwork()
   return useQuery({
     queryKey: ['allHookEvents', net.chainId, net.addr.hook],
     refetchInterval: REFRESH,
     queryFn: async () => {
+      let supa = []
       if (supabaseEnabled) {
         try {
-          const events = await fetchEventsFromSupabase(net.addr.hook)
+          supa = await fetchEventsFromSupabase(net.addr.hook)
           nudgeIndexer()
-          if (events.length > 0) return events
         } catch (err) {
-          console.warn('[schizo] Supabase event read failed, falling back to chain:', err)
+          console.warn('[schizo] Supabase event read failed, using chain only:', err)
         }
       }
-      return fetchEventsOnChain(net)
+      // Only scan the tail Supabase hasn't indexed yet (cheap); full window if empty.
+      const supaHead = supa.reduce((m, e) => (e.blockNumber > m ? e.blockNumber : m), 0n)
+      let recent = []
+      try {
+        recent = await fetchEventsOnChain(net, supaHead > 0n ? supaHead : undefined)
+      } catch (err) {
+        console.warn('[schizo] on-chain tail read failed:', err)
+        if (supa.length === 0) throw err // nothing to show → let React Query retry
+      }
+      return mergeEvents(supa, recent)
     },
   })
 }
