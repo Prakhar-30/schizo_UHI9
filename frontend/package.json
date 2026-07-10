@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "schizō — split your LP into yield (FEE-T) and risk (IL-T). Powered by Uniswap v4 + Reactive Network.",
+  "description": "schizō: split your LP into yield (FEE-T) and risk (IL-T). A single self-marking Uniswap v4 hook.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

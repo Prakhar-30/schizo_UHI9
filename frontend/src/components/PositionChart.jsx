@@ -7,12 +7,12 @@ import { humanPrice } from '../lib/il'
 // red = price down (net selling).
 const UP = '#26d07c'
 const DOWN = '#ff3b6b'
-const LIVE = '#2ef8d8' // mint — the forming/live candle, awaiting the next swap
+const LIVE = '#2ef8d8' // mint - the forming/live candle, awaiting the next swap
 const MAX_CANDLES = 32
 
 /**
  * Position history charts (stacked, full-width):
- *  1. Pool price as a candlestick chart — green candle = price rose during the
+ *  1. Pool price as a candlestick chart - green candle = price rose during the
  *     window (buy pressure), red = fell (sell pressure). Built from SwapOccurred
  *     prices: each candle opens at the previous close and closes at the latest
  *     price in its bucket, with wicks from the bucket's high/low.
@@ -56,7 +56,7 @@ export default function PositionChart({ ilMarks, swaps, entryPrice, dec0 = 18, d
       <CandleChart data={priceSeries} entryPrice={entryPrice} />
       <MiniChart
         title="Impermanent loss"
-        sub={ilSeries.length ? `${ilSeries.length} marks · one per RSC cycle` : 'no marks yet'}
+        sub={ilSeries.length ? `${ilSeries.length} marks · one per swap` : 'no marks yet'}
         data={ilPlot}
         getY={(d) => d.bps}
         formatY={(v) => fmtBpsPct(v)}
@@ -183,7 +183,6 @@ function CandleChart({ data, entryPrice }) {
           preserveAspectRatio="none"
           onMouseLeave={() => setHover(null)}
         >
-          {/* horizontal gridlines + price labels */}
           {[0, 0.25, 0.5, 0.75, 1].map((p) => {
             const y = PAD.t + p * (H - PAD.t - PAD.b)
             const v = yMax - p * (yMax - yMin)
@@ -211,7 +210,6 @@ function CandleChart({ data, entryPrice }) {
             )
           })}
 
-          {/* entry baseline */}
           {entryY !== null && (
             <>
               <line
@@ -236,7 +234,6 @@ function CandleChart({ data, entryPrice }) {
             </>
           )}
 
-          {/* candles */}
           {candles.map((c, i) => {
             const x = cx(i)
             const isLast = i === candles.length - 1
@@ -249,7 +246,6 @@ function CandleChart({ data, entryPrice }) {
             const isHover = hover === i
             return (
               <g key={i} opacity={hover != null && !isHover ? 0.55 : 1}>
-                {/* wick */}
                 <line
                   x1={x}
                   x2={x}
@@ -259,7 +255,6 @@ function CandleChart({ data, entryPrice }) {
                   strokeWidth="1.4"
                   vectorEffect="non-scaling-stroke"
                 />
-                {/* body */}
                 <rect
                   x={x - bodyW / 2}
                   y={top}
@@ -268,7 +263,7 @@ function CandleChart({ data, entryPrice }) {
                   fill={color}
                   rx="0.5"
                 />
-                {/* live pulse on the most-recent candle — breathes green until a
+                {/* live pulse on the most-recent candle - breathes green until a
                     new swap arrives, at which point the data refetches (12s poll)
                     and the pulse re-attaches to the new last candle on its own. */}
                 {isLast && (
@@ -291,7 +286,6 @@ function CandleChart({ data, entryPrice }) {
                     <circle cx={x} cy={sy(c.close)} r="2.4" fill={liveColor} />
                   </g>
                 )}
-                {/* hover hit-area */}
                 <rect
                   x={x - step / 2}
                   y={0}
@@ -306,7 +300,6 @@ function CandleChart({ data, entryPrice }) {
           })}
         </svg>
 
-        {/* hover tooltip */}
         {hover != null && (
           <div
             className="pointer-events-none absolute top-2 z-10 -translate-x-1/2 rounded-md border border-white/10 bg-ink px-2.5 py-1.5 font-mono text-[10px] leading-tight shadow-lg"

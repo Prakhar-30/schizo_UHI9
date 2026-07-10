@@ -112,13 +112,12 @@ export default function Pools() {
             Every pool the hook runs
           </h1>
           <p className="mt-3 max-w-xl text-sm text-bone/55 sm:text-base">
-            Dynamic-fee pools, each marked to market by the Reactive Network. Provide IL-bonded liquidity
+            Dynamic-fee pools, each marked to market by the hook on every swap. Provide IL-bonded liquidity
             on any of them. Prices are decimal-adjusted to whole units.
           </p>
         </div>
       </div>
 
-      {/* search */}
       <div className="mt-8">
         <input
           value={q}
@@ -128,7 +127,6 @@ export default function Pools() {
         />
       </div>
 
-      {/* sortable column headers (lg) */}
       <div className={`mt-6 hidden ${GRID_LG} gap-4 border-b border-white/10 px-4 pb-2 lg:grid`}>
         {COLUMNS.map((c) => {
           const active = sort.key === c.key
@@ -165,16 +163,14 @@ export default function Pools() {
               title={`Provide IL-bonded liquidity on ${r.label}`}
             >
               <div className={`grid grid-cols-2 items-center gap-4 ${GRID_LG}`}>
-                {/* pair */}
                 <div className="flex items-center gap-2">
                   <span className="font-display text-base font-bold">{r.label}</span>
                   {r.demo && <Chip color="mint">demo · faucet</Chip>}
                 </div>
 
-                {/* price */}
                 <div className="text-right">
                   <div className="font-mono text-sm font-bold tabular-nums">
-                    {r.price ? fmtNum(r.price, r.price < 1 ? 6 : 4) : '—'}
+                    {r.price ? fmtNum(r.price, r.price < 1 ? 6 : 4) : '–'}
                   </div>
                   <div
                     className={`font-mono text-[11px] tabular-nums ${
@@ -186,32 +182,27 @@ export default function Pools() {
                   </div>
                 </div>
 
-                {/* trend */}
                 <div className="flex justify-end">
                   <PoolTrend prices={r.prices} current={r.price} muted={r.swapCount === 0} loading={seriesLoading && r.swapCount === 0} />
                 </div>
 
-                {/* activity (swap count) */}
                 <div className="hidden text-right font-mono text-sm tabular-nums text-bone/70 lg:block">
                   {seriesLoading && r.swapCount === 0 ? '…' : r.swapCount}
                 </div>
 
-                {/* fee — color reddens as it rises above 0.30% */}
                 <div className="hidden text-right font-mono text-sm font-bold tabular-nums lg:block" style={feeStyle(r.dynFee)}>
-                  {r.dynFee !== undefined ? `${(r.dynFee / 10000).toFixed(3)}%` : '—'}
+                  {r.dynFee !== undefined ? `${(r.dynFee / 10000).toFixed(3)}%` : '–'}
                 </div>
 
-                {/* liquidity */}
                 <div className="hidden text-right font-mono text-sm tabular-nums text-bone/70 lg:block">
-                  {r.liquidity !== undefined ? fmtCompact(r.liquidity) : '—'}
+                  {r.liquidity !== undefined ? fmtCompact(r.liquidity) : '–'}
                 </div>
               </div>
 
-              {/* compact stats on small screens (fee + liquidity + activity) */}
               <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/8 pt-3 font-mono text-[11px] tabular-nums text-bone/50 lg:hidden">
                 <span>{seriesLoading && r.swapCount === 0 ? '…' : `${r.swapCount} swaps`}</span>
-                <span style={feeStyle(r.dynFee)}>{r.dynFee !== undefined ? `${(r.dynFee / 10000).toFixed(3)}% fee` : '—'}</span>
-                <span>{r.liquidity !== undefined ? `${fmtCompact(r.liquidity)} L` : '—'}</span>
+                <span style={feeStyle(r.dynFee)}>{r.dynFee !== undefined ? `${(r.dynFee / 10000).toFixed(3)}% fee` : '–'}</span>
+                <span>{r.liquidity !== undefined ? `${fmtCompact(r.liquidity)} L` : '–'}</span>
               </div>
             </Card>
           ))}

@@ -47,9 +47,9 @@ const splitSVG = `
   <text x="822" y="124" fill="#6a6a78" font-size="12">&#8594; for yield seekers</text>
   <rect class="pulseR" x="802" y="190" width="256" height="106" rx="14" fill="rgba(255,46,109,.06)" stroke="#ff2e6d" stroke-width="1.6"/>
   <text x="822" y="222" fill="#ff2e6d" font-size="19" font-weight="800">IL-T</text>
-  <text x="822" y="248" fill="#d8d3c6" font-size="13">bears the impermanent loss</text>
-  <text x="822" y="269" fill="#d8d3c6" font-size="13">pays a premium to take it</text>
-  <text x="822" y="288" fill="#6a6a78" font-size="12">&#8594; for volatility takers</text>
+  <text x="822" y="248" fill="#d8d3c6" font-size="13">absorbs the impermanent loss</text>
+  <text x="822" y="269" fill="#d8d3c6" font-size="13">earns a premium for holding it</text>
+  <text x="822" y="288" fill="#6a6a78" font-size="12">&#8594; for underwriters</text>
   <!-- live flow: one deposit packet, splitting into two -->
   <circle r="5.5" fill="#f3efe4">
     <animateMotion dur="2.4s" repeatCount="indefinite" calcMode="linear" keyPoints="0;1;1" keyTimes="0;0.42;1"><mpath xlink:href="#pIn"/></animateMotion>
@@ -65,40 +65,40 @@ const splitSVG = `
   </circle>
 </svg>`;
 
-/* ── live diagram 2: the reactive loop (swap → event → compute → settle → repeat) ── */
+/* ── live diagram 2: the marking loop (swap → smooth the mark → derive IL on read) ── */
 const loopSVG = `
 <svg class="diagram" viewBox="0 0 1080 300" preserveAspectRatio="xMidYMid meet" xmlns:xlink="http://www.w3.org/1999/xlink" role="img">
   <defs>
     <marker id="eM" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L8 3 L0 6 Z" fill="#2ef8d8"/></marker>
     <marker id="eV" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L8 3 L0 6 Z" fill="#7c5cff"/></marker>
     <path id="pEvt" d="M422 108 L654 108" fill="none"/>
-    <path id="pSet" d="M658 204 L426 204" fill="none"/>
+    <path id="pAsk" d="M658 204 L426 204" fill="none"/>
   </defs>
   <text x="230" y="22" fill="#6a6a78" font-size="11.5" text-anchor="middle" letter-spacing="2">SEPOLIA / UNICHAIN SEPOLIA</text>
-  <text x="850" y="22" fill="#6a6a78" font-size="11.5" text-anchor="middle" letter-spacing="2">REACTIVE LASNA</text>
+  <text x="850" y="22" fill="#6a6a78" font-size="11.5" text-anchor="middle" letter-spacing="2">ANYONE, ANYWHERE</text>
   <rect class="pulseW" x="40" y="40" width="380" height="228" rx="16" fill="#121218" stroke="#f3efe4" stroke-width="1.5"/>
   <text x="62" y="78" fill="#f3efe4" font-size="19" font-weight="800">ILBondHook</text>
-  <text x="62" y="99" fill="#6a6a78" font-size="11.5">v4 hook + callback contract</text>
+  <text x="62" y="99" fill="#6a6a78" font-size="11.5">one v4 hook &#183; the entire protocol</text>
   <g font-size="13" fill="#d8d3c6">
     <text x="62" y="136">&#8226; holds positions, mints FEE-T + IL-T</text>
-    <text x="62" y="162">&#8226; afterSwap &#8594; emits the live price</text>
-    <text x="62" y="188">&#8226; stays cheap on the hot path</text>
-    <text x="62" y="214">&#8226; receives the settled IL mark</text>
+    <text x="62" y="162">&#8226; afterSwap &#8594; smooths the marking price</text>
+    <text x="62" y="188">&#8226; two storage writes, hot path stays cheap</text>
+    <text x="62" y="214">&#8226; nothing external to fund or trust</text>
   </g>
   <rect class="pulseM" x="660" y="40" width="380" height="228" rx="16" fill="#121218" stroke="#2ef8d8" stroke-width="1.5"/>
-  <text x="682" y="78" fill="#2ef8d8" font-size="19" font-weight="800">ILBondReactive</text>
-  <text x="682" y="99" fill="#6a6a78" font-size="11.5">IL mark-to-market engine (ReactVM)</text>
+  <text x="682" y="78" fill="#2ef8d8" font-size="19" font-weight="800">Live IL, derived</text>
+  <text x="682" y="99" fill="#6a6a78" font-size="11.5">app &#183; indexer &#183; any contract</text>
   <g font-size="13" fill="#d8d3c6">
-    <text x="682" y="136">&#8226; subscribes to the swap event</text>
-    <text x="682" y="162">&#8226; pulls every open position</text>
-    <text x="682" y="188">&#8226; computes IL = 1 &#8722; 2&#8730;r/(1+r)</text>
-    <text x="682" y="214">&#8226; settles the mark back on-chain</text>
+    <text x="682" y="136">&#8226; calls ilMark(positionId), a free view</text>
+    <text x="682" y="162">&#8226; IL = 1 &#8722; 2&#8730;r/(1+r), pure &#38; exact</text>
+    <text x="682" y="188">&#8226; entry price vs the smoothed mark</text>
+    <text x="682" y="214">&#8226; fresh on every read, never stale</text>
   </g>
   <line x1="420" y1="108" x2="658" y2="108" stroke="#2ef8d8" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#eM)"/>
-  <text x="539" y="98" fill="#2ef8d8" font-size="11.5" text-anchor="middle">SwapOccurred &#8594; prepareILBondData</text>
+  <text x="539" y="98" fill="#2ef8d8" font-size="11.5" text-anchor="middle">SwapOccurred (price + smoothed mark)</text>
   <line x1="660" y1="204" x2="422" y2="204" stroke="#7c5cff" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#eV)"/>
-  <text x="541" y="224" fill="#7c5cff" font-size="11.5" text-anchor="middle">settleILMark &#8594; new IL posted</text>
-  <text x="540" y="252" fill="#6a6a78" font-size="10.5" text-anchor="middle">no keeper &#183; no cron &#183; fires on every swap</text>
+  <text x="541" y="224" fill="#7c5cff" font-size="11.5" text-anchor="middle">ilMark(id) &#8594; live IL, derived in-hook</text>
+  <text x="540" y="252" fill="#6a6a78" font-size="10.5" text-anchor="middle">no keeper &#183; no cron &#183; no oracle &#183; re-marks on every swap</text>
   <!-- swap trigger: a tab on the hook's top edge (clear of the bullet text) -->
   <circle cx="98" cy="39" r="6" fill="none" stroke="#ffb020" stroke-width="2">
     <animate attributeName="r" dur="2.4s" repeatCount="indefinite" values="6;19;19" keyTimes="0;0.2;1"/>
@@ -106,19 +106,19 @@ const loopSVG = `
   </circle>
   <rect x="58" y="28" width="80" height="22" rx="6" fill="#0a0a0f" stroke="#ffb020" stroke-width="1.4"/>
   <text x="98" y="43" fill="#ffb020" font-size="11" font-weight="800" text-anchor="middle">SWAP</text>
-  <!-- event packet: hook -> reactive (first half) -->
+  <!-- event packet: hook -> readers (first half) -->
   <circle r="6" fill="#2ef8d8">
     <animateMotion dur="2.4s" repeatCount="indefinite" calcMode="linear" keyPoints="0;1;1" keyTimes="0;0.5;1"><mpath xlink:href="#pEvt"/></animateMotion>
     <animate attributeName="opacity" dur="2.4s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;0.06;0.48;0.52;1"/>
   </circle>
-  <!-- compute pulse on the reactive box at mid-cycle -->
+  <!-- derive pulse on the reader box at mid-cycle -->
   <circle cx="850" cy="154" r="6" fill="none" stroke="#2ef8d8" stroke-width="2">
     <animate attributeName="r" dur="2.4s" repeatCount="indefinite" values="6;6;58;58" keyTimes="0;0.5;0.7;1"/>
     <animate attributeName="opacity" dur="2.4s" repeatCount="indefinite" values="0;0.9;0;0" keyTimes="0;0.5;0.7;1"/>
   </circle>
-  <!-- settle packet: reactive -> hook (second half) -->
+  <!-- read packet: reader -> hook (second half) -->
   <circle r="6" fill="#7c5cff">
-    <animateMotion dur="2.4s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1" keyTimes="0;0.55;1"><mpath xlink:href="#pSet"/></animateMotion>
+    <animateMotion dur="2.4s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1" keyTimes="0;0.55;1"><mpath xlink:href="#pAsk"/></animateMotion>
     <animate attributeName="opacity" dur="2.4s" repeatCount="indefinite" values="0;0;1;1;0" keyTimes="0;0.55;0.6;0.96;1"/>
   </circle>
 </svg>`;
@@ -126,18 +126,17 @@ const loopSVG = `
 /* ── live diagram 3: the exact message sequence (deposit, buy, then the loop) ── */
 const Tseq = 7;
 const lifelines = [
-  { x:130, w:122, name:'LP',             stroke:'#c6ff2e', sub:'liquidity provider' },
-  { x:380, w:122, name:'Buyer',          stroke:'#ff2e6d', sub:'IL-T taker' },
-  { x:650, w:188, name:'ILBondHook',     stroke:'#f3efe4', sub:'Uniswap v4' },
-  { x:940, w:188, name:'ILBondReactive', stroke:'#2ef8d8', sub:'Reactive Lasna' },
+  { x:130, w:122, name:'LP',         stroke:'#c6ff2e', sub:'liquidity provider' },
+  { x:380, w:122, name:'Buyer',      stroke:'#ff2e6d', sub:'IL-T underwriter' },
+  { x:650, w:188, name:'ILBondHook', stroke:'#f3efe4', sub:'Uniswap v4 · the whole system' },
+  { x:940, w:188, name:'Anyone',     stroke:'#2ef8d8', sub:'app · indexer · contract' },
 ];
 const seqMsgs = [
   { x1:130, x2:646, y:96,  c:'#cfcabb', dot:'#f3efe4', a:.03, b:.14, lab:'depositILBond()  →  mint FEE-T + IL-T' },
   { x1:380, x2:646, y:142, c:'#cfcabb', dot:'#f3efe4', a:.17, b:.28, lab:'buyILBond() + premium' },
-  { x1:654, x2:936, y:262, c:'#2ef8d8', dot:'#2ef8d8', a:.38, b:.50, lab:'SwapOccurred  (emitted on every swap)' },
-  { x1:936, x2:654, y:312, c:'#9a95a8', dot:'#cfcabb', a:.52, b:.63, lab:'prepareILBondData()' },
-  { x1:654, x2:936, y:362, c:'#9a95a8', dot:'#cfcabb', a:.65, b:.76, lab:'ILBondDataBundle  (per-position price)' },
-  { x1:936, x2:654, y:418, c:'#7c5cff', dot:'#7c5cff', a:.78, b:.90, lab:'settleILMark()  →  new IL posted' },
+  { x1:654, x2:936, y:262, c:'#2ef8d8', dot:'#2ef8d8', a:.38, b:.50, lab:'SwapOccurred  (price + smoothed mark)' },
+  { x1:936, x2:654, y:312, c:'#9a95a8', dot:'#cfcabb', a:.52, b:.63, lab:'ilMark(positionId)  [free view call]' },
+  { x1:654, x2:936, y:362, c:'#7c5cff', dot:'#7c5cff', a:.65, b:.78, lab:'live IL = 1 − 2√r/(1+r)  derived in-hook' },
 ];
 const mkOf = (c) => c === '#2ef8d8' ? 'smMint' : c === '#7c5cff' ? 'smVolt' : 'smGrey';
 const seqDot = (i, m) => {
@@ -180,10 +179,10 @@ const slides = [
     <div class="fbody" style="justify-content:center; gap:1.4rem">
       <img src="${hero}" style="height:clamp(56px,9vh,104px); width:auto"/>
       <h1>LP fees. Without the <span class="risk" style="position:relative">loss<svg width="100%" height="11" viewBox="0 0 200 11" preserveAspectRatio="none" style="position:absolute;left:0;bottom:-.16em"><path d="M2 7 Q 60 2 110 6 T 198 5" stroke="#ff2e6d" stroke-width="3" fill="none"/></svg></span>.</h1>
-      <p class="lead" style="font-size:1.25rem">Impermanent loss, unbundled. Pay someone else to take it &#8212; keep the yield.</p>
+      <p class="lead" style="font-size:1.25rem">Impermanent loss, hedged. An underwriter gets paid to take it. You keep the yield.</p>
       <div class="row" style="gap:.6rem; flex-wrap:wrap">
         <span class="chip volt"><span class="dot"></span> Uniswap v4 Hook</span>
-        <span class="chip mint"><span class="dot"></span> Reactive Network</span>
+        <span class="chip mint"><span class="dot"></span> Self-marking &#183; zero dependencies</span>
       </div>
     </div>
     ${foot('01')}
@@ -197,10 +196,10 @@ const slides = [
     <div class="fbody">
       <h2>Every LP position is two trades stapled together.</h2>
       <div class="grid2">
-        <div class="card"><span class="legtag fee">FEE-T side</span><p style="margin-top:.7rem;color:var(--soft)">Swap fees &#8212; steady, grows with volume, vol-positive. The yield a DAO treasury or stablecoin desk actually wants.</p></div>
-        <div class="card"><span class="legtag il">IL-T side</span><p style="margin-top:.7rem;color:var(--soft)">Impermanent loss &#8212; the bill when price moves, vol-negative. The pure price risk a volatility trader actually wants.</p></div>
+        <div class="card"><span class="legtag fee">FEE-T side</span><p style="margin-top:.7rem;color:var(--soft)">Swap fees: steady, grows with volume. The yield a DAO treasury or stablecoin desk actually wants.</p></div>
+        <div class="card"><span class="legtag il">IL-T side</span><p style="margin-top:.7rem;color:var(--soft)">Impermanent loss: the bill when price moves. A risk a long-vol desk would underwrite for the right premium, because it offsets their book.</p></div>
       </div>
-      <p class="lead">Sold as one bundle. The treasury that wants yield is forced to take the price risk &#8212; so it stays out. The trader who wants the risk won't babysit an LP &#8212; so they stay out too. <b>The liquidity that should exist never shows up.</b></p>
+      <p class="lead">Sold as one bundle. The treasury that wants yield is forced to hold the price risk, so it stays out. The desk that would underwrite the risk won't babysit an LP, so it stays out too. <b>The liquidity that should exist never shows up.</b></p>
     </div>
     ${foot('02')}
   </div>
@@ -213,7 +212,7 @@ const slides = [
     <div class="fbody" style="gap:.7rem">
       <h2>One deposit splits into two tradable claims.</h2>
       <div class="diagwrap">${splitSVG}</div>
-      <p class="lead">Both legs are transferable. Hold both = a normal LP. Sell IL-T = yield with the risk handed off. IL becomes a priced, tradable instrument.</p>
+      <p class="lead">Both legs are transferable. Hold both = a normal LP. Sell IL-T = a hedged LP: yield with the risk genuinely gone. IL becomes a hedge one side buys and a premium the other side earns.</p>
     </div>
     ${foot('03')}
   </div>
@@ -224,7 +223,7 @@ const slides = [
   <div class="frame">
     ${head('the message flow &#183; live')}
     <div class="fbody" style="gap:.5rem; justify-content:flex-start; padding-top:14px">
-      <h2>The exact handshake &#8212; deposit, sale, then the loop.</h2>
+      <h2>The exact handshake: deposit, hedge, then the loop.</h2>
       <div class="diagwrap">${sequenceSVG}</div>
     </div>
     ${foot('04')}
@@ -234,11 +233,11 @@ const slides = [
 /* 5 HOW IT WORKS (live) */
 `<section class="slide">
   <div class="frame">
-    ${head('how it works &#183; the reactive loop')}
+    ${head('how it works &#183; the marking loop')}
     <div class="fbody" style="gap:.7rem">
-      <h2>Two contracts, two chains, one event loop.</h2>
+      <h2>One contract. The hook is its own oracle.</h2>
       <div class="diagwrap">${loopSVG}</div>
-      <p class="lead">IL only changes on a swap &#8212; so the mark updates on <b>every swap</b>, trustlessly, off the hot path. The swap event is the trigger: no keeper, no cron.</p>
+      <p class="lead">IL only changes on a swap, and every swap goes through the hook, so the mark moves on <b>every swap</b> and the IL is derived fresh on <b>every read</b>. The marking price is smoothed and never stored, so no single trade can game it. No keeper, no cron, no oracle.</p>
     </div>
     ${foot('05')}
   </div>
@@ -249,15 +248,15 @@ const slides = [
   <div class="frame">
     ${head('live demo')}
     <div class="fbody">
-      <h2>A live system on two chains &#8212; let's run it.</h2>
+      <h2>A live system on two chains. Let's run it.</h2>
       <div class="grid3" style="margin-top:.3rem">
         <div class="card" style="text-align:center"><div class="big-num volt">2</div><p class="mute" style="margin-top:.4rem">independent chains<br>Sepolia &#183; Unichain Sepolia</p></div>
         <div class="card" style="text-align:center"><div class="big-num yield">45 + 3</div><p class="mute" style="margin-top:.4rem">live dynamic-fee pools</p></div>
-        <div class="card" style="text-align:center"><div class="big-num mint">74</div><p class="mute" style="margin-top:.4rem">passing tests<br>unit &#183; fuzz &#183; invariant</p></div>
+        <div class="card" style="text-align:center"><div class="big-num mint">72</div><p class="mute" style="margin-top:.4rem">passing tests<br>unit &#183; fuzz &#183; invariant</p></div>
       </div>
       <ul class="clean" style="margin-top:.7rem">
-        <li>Mint FEE-T + IL-T from real v4 liquidity; sell IL-T bilaterally &#8212; no insurance pool</li>
-        <li>Do a swap &#8212; the on-chain mark counter ticks up as the RSC re-marks every position</li>
+        <li>Mint FEE-T + IL-T from real v4 liquidity; hedge bilaterally, no insurance pool</li>
+        <li>Do a swap: every IL gauge moves as the hook re-prices every position off its own pool</li>
         <li>Dynamic fee climbs with realized volatility, exactly when IL risk is highest</li>
       </ul>
     </div>
@@ -270,11 +269,11 @@ const slides = [
   <div class="frame">
     ${head('where it goes')}
     <div class="fbody" style="gap:1.1rem">
-      <h2 style="max-width:26ch">IL stops being a tax. It becomes an asset class.</h2>
+      <h2 style="max-width:26ch">IL stops being a tax. It becomes a hedge.</h2>
       <div class="grid3">
-        <div class="card"><div class="kicker yield">Tranche IL-T</div><p class="mute" style="margin-top:.5rem">Senior eats the first 5%, junior the rest &#8212; two risk-adjusted yields.</p></div>
-        <div class="card"><div class="kicker volt">Cross-pool netting</div><p class="mute" style="margin-top:.5rem">One IL-T against net exposure &#8212; the RSC already sees every pool.</p></div>
-        <div class="card"><div class="kicker mint">IL futures</div><p class="mute" style="margin-top:.5rem">A dated IL-T: speculate on next-epoch IL vs a strike.</p></div>
+        <div class="card"><div class="kicker yield">Tranche IL-T</div><p class="mute" style="margin-top:.5rem">Senior eats the first 5%, junior the rest: two risk-adjusted premiums.</p></div>
+        <div class="card"><div class="kicker volt">Cross-pool netting</div><p class="mute" style="margin-top:.5rem">One IL-T hedges a book's net exposure; the hook already marks every pool.</p></div>
+        <div class="card"><div class="kicker mint">Dated hedges</div><p class="mute" style="margin-top:.5rem">An IL-T with an expiry and a strike: term protection through a catalyst.</p></div>
       </div>
       <div class="row" style="margin-top:.2rem; gap:.8rem; align-items:center">
         <img class="mk" src="${mk}" style="height:34px"/>
@@ -419,7 +418,7 @@ const html = `<!doctype html>
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>schizo — pitch deck</title>
+<title>schizo · pitch deck</title>
 <style>${css}</style>
 </head>
 <body>

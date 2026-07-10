@@ -11,14 +11,8 @@ export const supabaseEnabled = !!supabase
 
 const BIGINT_RE = /^-?\d+$/
 
-/**
- * Restore the exact types the on-chain decode produced. The indexer stores event
- * args as JSON with bigints serialized to decimal strings; numbers (e.g. int24
- * `tick`) and hex strings (addresses, bytes32) are stored as-is. Walk the object
- * and turn decimal-string scalars back into BigInt so downstream consumers
- * (sqrtPriceToPrice, premium sums, .toString(), …) behave identically to the
- * viem path.
- */
+// The indexer serializes bigint args to decimal strings; revive them so rows
+// behave identically to the viem decode path.
 function reviveArgs(args) {
   if (!args || typeof args !== 'object') return args
   const out = Array.isArray(args) ? [] : {}
@@ -43,12 +37,8 @@ export function rowToEvent(row) {
   }
 }
 
-/**
- * Fetch the full hook-event history from Supabase (no 9500-block / ~32h cap).
- * Pages through results so it keeps working past the 1000-row default limit.
- * Returns events in the same shape as the on-chain path. Throws on error so the
- * caller can fall back to reading logs directly.
- */
+// Full hook-event history from Supabase (paged past the 1000-row limit).
+// Throws on error so the caller can fall back to reading logs directly.
 export async function fetchEventsFromSupabase(hookAddr = ADDR.hook) {
   if (!supabase) throw new Error('supabase not configured')
   const HOOK_ADDR = hookAddr.toLowerCase()
@@ -70,10 +60,8 @@ export async function fetchEventsFromSupabase(hookAddr = ADDR.hook) {
   return all.map(rowToEvent)
 }
 
-// Fire-and-forget nudge to the server-side indexer so freshly-emitted events
-// show up between cron runs (important on Vercel Hobby, where crons are daily).
-// Throttled to once per 30s per tab; silently no-ops if /api isn't available
-// (e.g. plain `npm run dev`).
+// Fire-and-forget nudge to the indexer between cron runs (Vercel Hobby crons
+// are daily). Throttled per tab; no-ops without /api (plain `npm run dev`).
 let lastNudge = 0
 export function nudgeIndexer() {
   const now = Date.now()

@@ -23,8 +23,9 @@ interface IMintable {
     function mint(address to, uint256 amount) external;
 }
 
-/// @notice Fresh hook (v3) + all 45 pair combinations across the 10 existing
-///         tokens, each seeded with ~150 human units/side. Tokens are reused.
+/// @notice Fresh self-contained hook (v5, no external dependencies) + all 45 pair
+///         combinations across the 10 existing tokens, each seeded with ~150
+///         human units/side. Tokens are reused.
 contract FreshDeploy is BaseScript {
     using PoolIdLibrary for PoolKey;
 
@@ -32,7 +33,6 @@ contract FreshDeploy is BaseScript {
     int24 constant SPACING = 60;
     int256 constant TICKS_PER_DECADE = 23027;
     uint256 constant HUMAN = 150; // liquidity units per side
-    address constant DEFAULT_CALLBACK_PROXY = 0xc9f36411C9897e7F959D99ffca2a0Ba7ee0D7bDA;
 
     // Existing tokens (6 custom mintable + 4 real). Order is fixed so the
     // frontend can regenerate the same 45 combinations.
@@ -57,18 +57,17 @@ contract FreshDeploy is BaseScript {
     uint256 created;
 
     function run() public {
-        address callbackProxy = vm.envOr("CALLBACK_PROXY", DEFAULT_CALLBACK_PROXY);
         tickLower = TickMath.minUsableTick(SPACING);
         tickUpper = TickMath.maxUsableTick(SPACING);
 
         vm.startBroadcast();
         me = msg.sender;
 
-        // 1) fresh hook
+        // 1) fresh hook (fully self-contained: no callback proxy, nothing to fund)
         uint160 flags = uint160(Hooks.AFTER_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG);
-        bytes memory args = abi.encode(poolManager, callbackProxy);
+        bytes memory args = abi.encode(poolManager);
         (address hookAddr, bytes32 salt) = HookMiner.find(CREATE2_FACTORY, flags, type(ILBondHook).creationCode, args);
-        hook = new ILBondHook{salt: salt}(poolManager, callbackProxy);
+        hook = new ILBondHook{salt: salt}(poolManager);
         require(address(hook) == hookAddr, "hook addr mismatch");
         console2.log("HOOK", address(hook));
 
@@ -113,6 +112,15 @@ contract FreshDeploy is BaseScript {
 
         uint256 raw0 = HUMAN * (10 ** d0);
         uint256 raw1 = HUMAN * (10 ** d1);
+
+        // Skip seeding when the deployer can't cover a side: a reverting call
+        // inside try/catch still lands in the broadcast queue and fails the
+        // whole simulation, so the check must happen before the call.
+        if (IERC20(t0).balanceOf(me) < raw0 + 1e6 || IERC20(t1).balanceOf(me) < raw1 + 1e6) {
+            console2.log("SEED_SKIP", t0, t1);
+            return;
+        }
+
         uint128 liq = LiquidityAmounts.getLiquidityForAmounts(
             sp, TickMath.getSqrtPriceAtTick(tickLower), TickMath.getSqrtPriceAtTick(tickUpper), raw0, raw1
         );

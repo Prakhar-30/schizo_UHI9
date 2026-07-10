@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# swap-all-pools.sh — guarantees EVERY C(10,2)=45 pool gets MIN..MAX randomized
+# swap-all-pools.sh - guarantees EVERY C(10,2)=45 pool gets MIN..MAX randomized
 # swaps, random direction (buy & sell), with larger amounts and >=GAP seconds
-# between each on-chain swap so the Reactive Network reacts + lands a callback per
-# swap (no callback bundling). Progress is appended to scripts/swap-all-pools.log.
+# between each on-chain swap so every swap lands as its own mark/data point.
+# Progress is appended to scripts/swap-all-pools.log.
 #
 # usage: ./swap-all-pools.sh [MIN] [MAX] [GAP] [LO] [HI]
 #   MIN/MAX = swaps per pool (default 10/15)
@@ -12,7 +12,7 @@ set -u
 
 SEP=https://ethereum-sepolia-rpc.publicnode.com
 ROUTER=0xf13D190e9117920c703d79B5F33732e10049b115
-HOOK=0x58A3A816864F1E5f6F38F01f9f5AE1Cacc9210C0
+HOOK=0x57696AB5077Aa634c13682C3d3E84287935290c0
 FEE=8388608   # DYNAMIC_FEE_FLAG
 SPACING=60
 MAXU=$(cast max-uint)

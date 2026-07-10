@@ -11,9 +11,9 @@ export const config = { runtime: 'edge' }
 //    for whichever chain the share URL carries (?chain=<id>), so Unichain
 //    positions get a Unichain card and Sepolia positions a Sepolia card.
 const UNICHAIN_RAW_TOKENS = [
-  { address: '0x20D8D70AF616471Ff6e651f89Ff2cA1cA3fb5010', symbol: 'mWETH', name: 'Mock Wrapped Ether', decimals: 18 },
-  { address: '0x93336712394A7bE6DC61CFCF38d0431185B5c3A2', symbol: 'mWBTC', name: 'Mock Wrapped BTC', decimals: 8 },
-  { address: '0x173e3Ab5Db82a0A67ee2B4a640E8848440aD149f', symbol: 'mUSDC', name: 'Mock USD Coin', decimals: 6 },
+  { address: '0xC72377c60F46b7Bf812A55728d3b4c57b7Be692e', symbol: 'mWETH', name: 'Mock Wrapped Ether', decimals: 18 },
+  { address: '0x18CF733BD208ff54d4855bcA459F5099f38d4f2C', symbol: 'mWBTC', name: 'Mock Wrapped BTC', decimals: 8 },
+  { address: '0xdC37BdfDf525769f96d46728aC8caC82823b69D3', symbol: 'mUSDC', name: 'Mock USD Coin', decimals: 6 },
 ]
 
 const chainDef = (id, name, rpc) => ({
@@ -31,19 +31,19 @@ const NETWORKS = {
     hook: ADDR.hook,
     poolManager: ADDR.poolManager,
     stateView: ADDR.stateView,
-    deployBlock: 11008000n,
+    deployBlock: 11239703n,
     rpc: SEPOLIA_RPC,
     chain: chainDef(11155111, 'Ethereum Sepolia', SEPOLIA_RPC),
     poolsById: buildPoolRegistry({ rawTokens: SEPOLIA_RAW_TOKENS, hook: ADDR.hook, demoPair: ['WETH', 'WBTC'] }).poolsById,
   },
   1301: {
-    hook: '0x56B99A42E41D5987b2F39E97F3EBe5f3d76e10C0',
+    hook: '0x20487A756FececfF800d15EC76C78e0487A2D0c0',
     poolManager: '0x00B036B58a818B1BC34d502D3fE730Db729e62AC',
     stateView: '0xc199F1072a74D4e905ABa1A84d9a45E2546B6222',
-    deployBlock: 54154700n,
+    deployBlock: 56790639n,
     rpc: UNICHAIN_RPC,
     chain: chainDef(1301, 'Unichain Sepolia', UNICHAIN_RPC),
-    poolsById: buildPoolRegistry({ rawTokens: UNICHAIN_RAW_TOKENS, hook: '0x56B99A42E41D5987b2F39E97F3EBe5f3d76e10C0', demoPair: ['mWETH', 'mUSDC'] }).poolsById,
+    poolsById: buildPoolRegistry({ rawTokens: UNICHAIN_RAW_TOKENS, hook: '0x20487A756FececfF800d15EC76C78e0487A2D0c0', demoPair: ['mWETH', 'mUSDC'] }).poolsById,
   },
 }
 
@@ -89,14 +89,14 @@ function liveIlBps(entrySqrt, curSqrt) {
 
 function fmtAmount(v, decimals) {
   const n = Number(v) / 10 ** decimals
-  if (!isFinite(n)) return '—'
+  if (!isFinite(n)) return '–'
   if (n !== 0 && Math.abs(n) < 0.0001) return '<0.0001'
   return n.toLocaleString('en-US', { maximumFractionDigits: 4 })
 }
 
 function fmtCompact(v) {
   const n = Number(v)
-  if (!isFinite(n)) return '—'
+  if (!isFinite(n)) return '–'
   const abs = Math.abs(n)
   const u = [
     [1e24, 'Y'], [1e21, 'Z'], [1e18, 'E'], [1e15, 'P'], [1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'K'],
@@ -123,7 +123,7 @@ function fmtBpsPct(bps) {
   return (n > 0 ? '+' : '') + n.toFixed(2) + '%'
 }
 
-// Every Satori container needs an explicit display value — there is no implicit
+// Every Satori container needs an explicit display value - there is no implicit
 // block layout. Helper sets display:flex so individual call sites can override.
 const box = (style, ...kids) => h('div', { style: { display: 'flex', ...style } }, ...kids)
 
@@ -193,7 +193,7 @@ export default async function handler(req) {
 
   const dec1 = pool?.dec1 ?? 18
   const sym1 = pool?.sym1 || ''
-  const premiumStr = pos ? `${fmtAmount(pos.askPremium, dec1)}${sym1 ? ' ' + sym1 : ''}` : '—'
+  const premiumStr = pos ? `${fmtAmount(pos.askPremium, dec1)}${sym1 ? ' ' + sym1 : ''}` : '–'
   const subtitle = pool ? `IL Bond Position · ${pool.label}` : 'IL Bond Position'
 
   const ilColor = !pos ? C.mute : ilNum <= -400 ? C.risk : ilNum <= -100 ? C.amber : C.yield
@@ -265,7 +265,7 @@ export default async function handler(req) {
               textTransform: 'uppercase',
             },
             box({ width: 8, height: 8, background: C.volt, borderRadius: '50%' }),
-            box({}, 'Reactive Network'),
+            box({}, 'Uniswap v4 Hook'),
           ),
         ),
 
@@ -306,9 +306,9 @@ export default async function handler(req) {
           },
           Stat('Premium', premiumStr, C.yield),
           box({ width: 2, background: C.line }),
-          Stat('IL Mark', pos ? fmtBpsPct(ilNum) : '—', ilColor),
+          Stat('IL Mark', pos ? fmtBpsPct(ilNum) : '–', ilColor),
           box({ width: 2, background: C.line }),
-          Stat('Liquidity', pos ? fmtCompact(pos.liquidity) : '—', C.bone),
+          Stat('Liquidity', pos ? fmtCompact(pos.liquidity) : '–', C.bone),
         ),
       ),
 
@@ -324,7 +324,7 @@ export default async function handler(req) {
           box({ width: 10, height: 10, background: C.mint, borderRadius: '50%' }),
           box(
             { fontSize: 18, color: C.mute, letterSpacing: '0.2em', textTransform: 'uppercase' },
-            (cfg.chain?.name || 'Sepolia') + ' · marked by RSC',
+            (cfg.chain?.name || 'Sepolia') + ' · marked in-hook',
           ),
         ),
       ),

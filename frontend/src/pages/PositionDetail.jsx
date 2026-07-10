@@ -37,7 +37,6 @@ export default function PositionDetail() {
 
   const { positions, isLoading, refetch } = usePositions()
   const position = positions.find((p) => Number(p.id) === positionId)
-  const { bundles } = useHookCounters()
   const history = usePositionHistory(positionId, position?.poolId)
 
   const [transfer, setTransfer] = useState(null) // 'fee' | 'il' | null
@@ -63,7 +62,7 @@ export default function PositionDetail() {
         </p>
         <div className="mt-6 flex justify-center gap-3">
           <Button to="/markets" variant="bone" size="md">See all positions</Button>
-          <Button to="/hunt" variant="outline" size="md">Hunt mode</Button>
+          <Button to="/hunt" variant="outline" size="md">Underwrite</Button>
         </div>
       </div>
     )
@@ -84,7 +83,7 @@ export default function PositionDetail() {
     tickUpper,
   } = position
 
-  // IL marked to the live pool price (falls back to the last on-chain RSC mark).
+  // IL marked to the live pool price (falls back to the hook's smoothed mark).
   const displayIlBps = liveIlBps !== undefined ? liveIlBps : ilMarkBps
 
   const isLp = isSameAddr(address, lp)
@@ -154,14 +153,12 @@ export default function PositionDetail() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      {/* breadcrumb */}
       <div className="mb-4 flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-bone/40">
         <Link to="/markets" className="hover:text-volt">markets</Link>
         <span>›</span>
         <span>position #{positionId}</span>
       </div>
 
-      {/* header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <Kicker>Position</Kicker>
@@ -190,13 +187,12 @@ export default function PositionDetail() {
         )}
       </div>
 
-      {/* stats */}
       <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
         <Stat
           label="IL mark"
-          value={displayIlBps !== undefined ? fmtBpsPct(displayIlBps) : '—'}
+          value={displayIlBps !== undefined ? fmtBpsPct(displayIlBps) : '–'}
           accent="risk"
-          sub={bundles > 0n ? 'live · marked to pool price' : 'awaiting first mark'}
+          sub="live · derived in-hook"
         />
         <Stat
           label="Premium"
@@ -217,12 +213,10 @@ export default function PositionDetail() {
         />
       </div>
 
-      {/* body — charts get the wide column on the right (and show first on mobile);
+      {/* body - charts get the wide column on the right (and show first on mobile);
           holders + your moves sit on the narrower left. */}
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_1.7fr]">
-        {/* charts + history (right on desktop, first on mobile) */}
         <div className="space-y-6 lg:order-2">
-          {/* price + IL charts */}
           <PositionChart
             ilMarks={history.ilMarks}
             swaps={history.swaps}
@@ -231,7 +225,6 @@ export default function PositionDetail() {
             dec1={dec1}
           />
 
-          {/* gauge */}
           <Card className="p-5 sm:p-6">
             <Kicker>Live IL mark</Kicker>
             <div className="mt-3">
@@ -239,7 +232,6 @@ export default function PositionDetail() {
             </div>
           </Card>
 
-          {/* outcome calculator */}
           <OutcomeStrip
             entrySqrtPriceX96={entrySqrtPriceX96}
             currentSqrtPriceX96={position.currentSqrtPriceX96}
@@ -247,7 +239,6 @@ export default function PositionDetail() {
             liquidity={liquidity}
           />
 
-          {/* activity */}
           <Card className="p-5 sm:p-6">
             <div className="flex items-center justify-between">
               <Kicker>This position's history</Kicker>
@@ -264,9 +255,7 @@ export default function PositionDetail() {
           </Card>
         </div>
 
-        {/* aside — holders / your moves / share / receipts (left on desktop) */}
         <aside className="space-y-6 lg:order-1">
-          {/* holders */}
           <Card className="p-5 sm:p-6">
             <Kicker>Holders</Kicker>
             <div className="mt-3 space-y-3">
@@ -278,7 +267,6 @@ export default function PositionDetail() {
             </div>
           </Card>
 
-          {/* actions */}
           {(involved || canBuy) && (
             <Card className="p-5 sm:p-6">
               <Kicker>Your moves</Kicker>
@@ -307,10 +295,8 @@ export default function PositionDetail() {
             </Card>
           )}
 
-          {/* share */}
           <SharePanel positionId={positionId} position={position} />
 
-          {/* receipts */}
           {history.created && (
             <Card className="p-5 sm:p-6">
               <Kicker>Receipts</Kicker>

@@ -56,7 +56,7 @@ export function SectionHead({ kicker, title, sub, right, className = '' }) {
 
 export function Addr({ value, href, className = '' }) {
   const [done, setDone] = useState(false)
-  if (!value) return <span className="text-bone/30">—</span>
+  if (!value) return <span className="text-bone/30">–</span>
   return (
     <span className={`inline-flex items-center gap-1.5 font-mono text-xs ${className}`}>
       <button

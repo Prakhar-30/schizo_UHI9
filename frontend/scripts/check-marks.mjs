@@ -1,12 +1,12 @@
 import { createPublicClient, http, parseAbi, keccak256, encodeAbiParameters } from 'viem'
 
 const c = createPublicClient({ transport: http('https://ethereum-sepolia-rpc.publicnode.com') })
-const HOOK = '0x58A3A816864F1E5f6F38F01f9f5AE1Cacc9210C0' // v3
+const HOOK = '0x57696AB5077Aa634c13682C3d3E84287935290c0' // v3
 const SV = '0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c'
 const FEE = 0x800000, SPACING = 60
 const hookAbi = parseAbi([
   'function getPosition(uint256) view returns (address lp,address feeHolder,address ilHolder,bool active,bool ilBondSold,uint128 liquidity,uint160 entrySqrtPriceX96,int256 ilMarkBps,uint256 markValue,uint256 askPremium)',
-  'function bundleCounter() view returns (uint256)',
+  'function nextPositionId() view returns (uint256)',
   'function currentFee(bytes32) view returns (uint24)',
 ])
 const svAbi = parseAbi(['function getSlot0(bytes32) view returns (uint160 sqrtPriceX96,int24 tick,uint24 pf,uint24 lpFee)'])
@@ -24,13 +24,13 @@ const pools = [
 const Q96 = 2 ** 96
 const ilPct = (e, c2) => { const r=(Number(c2)/Q96)**2/((Number(e)/Q96)**2); return (1-(2*Math.sqrt(r))/(1+r))*100 }
 
-console.log('hook v3 bundleCounter:', (await c.readContract({ address: HOOK, abi: hookAbi, functionName: 'bundleCounter' })).toString())
+console.log('hook nextPositionId:', (await c.readContract({ address: HOOK, abi: hookAbi, functionName: 'nextPositionId' })).toString())
 for (const p of pools) {
   const pos = await c.readContract({ address: HOOK, abi: hookAbi, functionName: 'getPosition', args: [BigInt(p.id)] })
   const slot0 = await c.readContract({ address: SV, abi: svAbi, functionName: 'getSlot0', args: [p.poolId] })
   const fee = await c.readContract({ address: HOOK, abi: hookAbi, functionName: 'currentFee', args: [p.poolId] })
   console.log(`\n#${p.id} ${p.label}  sold=${pos[4]}`)
   console.log(`  live IL (computed): ${ilPct(pos[6], slot0[0]).toFixed(3)}%`)
-  console.log(`  on-chain ilMarkBps (RSC): ${pos[7]} (${Number(pos[7]) / 100}%)`)
+  console.log(`  on-chain ilMarkBps (smoothed mark): ${pos[7]} (${Number(pos[7]) / 100}%)`)
   console.log(`  live fee: ${(Number(fee) / 10000).toFixed(3)}%`)
 }

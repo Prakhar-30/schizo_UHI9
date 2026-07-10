@@ -94,36 +94,35 @@ export default function Create() {
         functionName: 'depositILBond',
         args: [pool.key, TICK_LOWER, TICK_UPPER, L, max0, max1, ask],
       },
-      { pendingMsg: 'Minting your IL bond…', successMsg: 'Bond minted — FEE-T + IL-T are yours', onSuccess: refetchTokens },
+      { pendingMsg: 'Minting your IL bond…', successMsg: 'Bond minted. FEE-T + IL-T are yours', onSuccess: refetchTokens },
     )
   }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
       <div className="mb-8 sm:mb-10">
-        <Kicker>Creator console</Kicker>
+        <Kicker>Hedging desk</Kicker>
         <h1 className="mt-2 font-black text-balance text-3xl tracking-tight sm:text-5xl">Mint an IL bond</h1>
         <p className="mt-3 max-w-2xl text-sm text-bone/55 sm:text-base">
           Pick a pool, add your two tokens, then name a premium. You get back two pieces: keep{' '}
-          <Leg kind="fee" className="mx-0.5" /> for the steady earnings, and sell <Leg kind="il" className="mx-0.5" /> — the
-          price risk — to someone who wants it.
+          <Leg kind="fee" className="mx-0.5" /> for the steady earnings, and hand <Leg kind="il" className="mx-0.5" />, the
+          price risk, to an underwriter who gets paid to hold it. That's your hedge.
         </p>
       </div>
 
-      {/* steer hunters to the other side of the market */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-risk/30 bg-risk/[0.06] px-4 py-3">
         <p className="font-mono text-sm text-bone/70">
-          <span className="text-risk">Looking to hunt?</span> If you'd rather <b className="text-bone">buy</b> impermanent-loss risk for a premium instead of minting, the open bonds live on the Hunt page.
+          <span className="text-risk">On the other side?</span> If you'd rather <b className="text-bone">earn premiums</b> by underwriting impermanent-loss risk instead of minting, the open bonds live on the Underwrite page.
         </p>
         <Button to="/hunt" variant="risk" size="sm">
-          I'm a hunter →
+          I'm an underwriter →
         </Button>
       </div>
 
       {wrongChain && (
         <div className="mb-6 flex items-center gap-3 rounded-xl border-2 border-amber/40 bg-amber/5 p-4">
           <Dot color="amber" pulse />
-          <p className="font-mono text-sm text-amber">You're on a different network — transactions will prompt a switch to {net.name}.</p>
+          <p className="font-mono text-sm text-amber">You're on a different network. Transactions will prompt a switch to {net.name}.</p>
         </div>
       )}
 
@@ -179,7 +178,7 @@ export default function Create() {
               <Divider className="my-4" />
               <div className="flex items-center justify-between font-mono text-[11px] text-bone/45">
                 <span>liquidity (L) minted</span>
-                <span className="text-bone/70">{L > 0n ? fmtCompact(L) : '—'}</span>
+                <span className="text-bone/70">{L > 0n ? fmtCompact(L) : '–'}</span>
               </div>
               <div className="mt-1.5 flex items-center justify-between font-mono text-[11px] text-bone/45">
                 <span>max pulled (refundable)</span>
@@ -250,7 +249,7 @@ export default function Create() {
               </li>
               <li className="flex justify-between">
                 <span className="text-bone/45">Current tick</span>
-                <span className="font-mono tabular-nums">{price?.tick ?? '—'}</span>
+                <span className="font-mono tabular-nums">{price?.tick ?? '–'}</span>
               </li>
               <li className="flex justify-between">
                 <span className="text-bone/45">Live fee</span>

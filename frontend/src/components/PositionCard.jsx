@@ -35,7 +35,7 @@ export default function PositionCard({ position, marked = true, onAction }) {
   const premSym = position.premiumSym || 'token1'
   const premDec = position.premiumDec ?? 18
   const premiumToken = position.premiumToken || net.demoPool.token1
-  // Prefer the live (pool-price) mark; fall back to the last on-chain RSC mark.
+  // Prefer the live (pool-price) mark; fall back to the hook's smoothed mark.
   const displayIlBps = liveIlBps !== undefined ? liveIlBps : ilMarkBps
   const { address, isConnected } = useAccount()
   const publicClient = usePublicClient({ chainId: net.chainId })
@@ -96,7 +96,6 @@ export default function PositionCard({ position, marked = true, onAction }) {
 
   return (
     <Card className="flex flex-col p-4 sm:p-5">
-      {/* header */}
       <div className="flex items-center justify-between">
         <Link to={`/positions/${id}`} className="flex items-center gap-2 hover:text-volt">
           <span className="font-black text-xl">#{id}</span>
@@ -111,12 +110,10 @@ export default function PositionCard({ position, marked = true, onAction }) {
         <Chip color={ilBondSold ? 'risk' : 'amber'}>{ilBondSold ? 'IL-T sold' : 'IL-T open'}</Chip>
       </div>
 
-      {/* il gauge */}
       <div className="mt-4">
         <ILGauge ilMarkBps={displayIlBps} marked={marked} />
       </div>
 
-      {/* numbers */}
       <div className="mt-4 grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
           <p className="kicker">{position.pool?.label || 'Liquidity'}</p>
@@ -128,14 +125,12 @@ export default function PositionCard({ position, marked = true, onAction }) {
         </div>
       </div>
 
-      {/* holders */}
       <div className="mt-4">
         <HolderRow kind="fee" holder={feeHolder} mine={isFee} />
         <Divider />
         <HolderRow kind="il" holder={ilHolder} mine={isIl} />
       </div>
 
-      {/* actions */}
       <div className="mt-auto pt-5">
         {canBuy && (
           <Button variant="risk" size="md" className="w-full" loading={pending} onClick={handleBuy}>

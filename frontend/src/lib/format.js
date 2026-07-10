@@ -11,12 +11,12 @@ export const isZero = (a) => !a || a.toLowerCase() === ZERO
 
 /** Format a bigint token amount with grouped, trimmed decimals. */
 export function fmtToken(value, decimals = 18, maxFrac = 4) {
-  if (value === undefined || value === null) return '—'
+  if (value === undefined || value === null) return '–'
   let s
   try {
     s = formatUnits(typeof value === 'bigint' ? value : BigInt(value), decimals)
   } catch {
-    return '—'
+    return '–'
   }
   const n = Number(s)
   if (!isFinite(n)) return s
@@ -25,7 +25,7 @@ export function fmtToken(value, decimals = 18, maxFrac = 4) {
 }
 
 export function fmtNum(n, maxFrac = 2) {
-  if (n === undefined || n === null || !isFinite(Number(n))) return '—'
+  if (n === undefined || n === null || !isFinite(Number(n))) return '–'
   return Number(n).toLocaleString('en-US', { maximumFractionDigits: maxFrac })
 }
 
@@ -34,14 +34,14 @@ export function fmtNum(n, maxFrac = 2) {
  * scientific notation past 1e15. Used for raw liquidity (L) which can be huge.
  */
 export function fmtCompact(value, decimals = 0) {
-  if (value === undefined || value === null) return '—'
+  if (value === undefined || value === null) return '–'
   let n
   try {
     n = typeof value === 'bigint' ? Number(formatUnits(value, decimals)) : Number(value)
   } catch {
-    return '—'
+    return '–'
   }
-  if (!isFinite(n)) return '—'
+  if (!isFinite(n)) return '–'
   const abs = Math.abs(n)
   if (abs >= 1e27) return n.toExponential(2)
   const units = [
@@ -62,7 +62,7 @@ export function fmtCompact(value, decimals = 0) {
 
 /** signed bps (e.g. -468) → "-4.68%" */
 export function fmtBpsPct(bps) {
-  if (bps === undefined || bps === null) return '—'
+  if (bps === undefined || bps === null) return '–'
   const n = Number(bps) / 100
   const sign = n > 0 ? '+' : ''
   return `${sign}${n.toFixed(2)}%`

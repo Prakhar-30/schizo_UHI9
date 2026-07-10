@@ -21,8 +21,7 @@ import {MockERC20} from "../src/MockERC20.sol";
 
 /// @notice Small, self-contained ILBondHook deployment for Unichain Sepolia (1301):
 ///         fresh hook + 3 mintable mock tokens + 3 pairs (seeded) + 2 open positions.
-///         The Reactive contract is deployed separately on Lasna (forge create) and
-///         points its callbacks back at the hook printed here.
+///         The hook is the whole system: marks derive on-chain, nothing else to deploy.
 ///
 ///   forge script script/30_UnichainDeploy.s.sol --rpc-url https://sepolia.unichain.org \
 ///       --private-key $KEY --broadcast --slow
@@ -34,8 +33,6 @@ contract UnichainDeploy is BaseScript {
     int256 constant TICKS_PER_DECADE = 23027;
     uint256 constant SEED = 150;       // human units/side of base liquidity
     uint256 constant POS_UNITS = 20;   // human units/side backing each opened position
-    // Unichain Sepolia reactive callback proxy (authorized sender for hook callbacks).
-    address constant DEFAULT_CALLBACK_PROXY = 0x9299472A6399Fd1027ebF067571Eb3e3D7837FC4;
 
     ILBondHook hook;
     int24 tickLower;
@@ -45,7 +42,6 @@ contract UnichainDeploy is BaseScript {
     MockERC20[3] tokens;
 
     function run() public {
-        address callbackProxy = vm.envOr("CALLBACK_PROXY", DEFAULT_CALLBACK_PROXY);
         tickLower = TickMath.minUsableTick(SPACING);
         tickUpper = TickMath.maxUsableTick(SPACING);
 
@@ -54,9 +50,9 @@ contract UnichainDeploy is BaseScript {
 
         // 1) hook (CREATE2, mined for the permission-flag bits)
         uint160 flags = uint160(Hooks.AFTER_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG);
-        bytes memory args = abi.encode(poolManager, callbackProxy);
+        bytes memory args = abi.encode(poolManager);
         (address hookAddr, bytes32 salt) = HookMiner.find(CREATE2_FACTORY, flags, type(ILBondHook).creationCode, args);
-        hook = new ILBondHook{salt: salt}(poolManager, callbackProxy);
+        hook = new ILBondHook{salt: salt}(poolManager);
         require(address(hook) == hookAddr, "hook addr mismatch");
         console2.log("HOOK", address(hook));
 
@@ -77,16 +73,11 @@ contract UnichainDeploy is BaseScript {
         _pool(address(tokens[0]), address(tokens[2])); // mWETH / mUSDC
         _pool(address(tokens[1]), address(tokens[2])); // mWBTC / mUSDC
 
-        // 4) open 2 IL-bond positions (left unsold so they're buyable in Hunt)
+        // 4) open 2 IL-bond positions (left unsold so they're open to underwrite)
         uint256 p0 = _openPosition(address(tokens[0]), address(tokens[2])); // mWETH/mUSDC
         uint256 p1 = _openPosition(address(tokens[1]), address(tokens[2])); // mWBTC/mUSDC
         console2.log("POSITION_0", p0);
         console2.log("POSITION_1", p1);
-
-        // 5) fund the hook so it can pay for reactive callbacks (AbstractPayer)
-        (bool ok,) = address(hook).call{value: 0.05 ether}("");
-        require(ok, "hook fund failed");
-        console2.log("HOOK_FUNDED_WEI", uint256(0.05 ether));
 
         vm.stopBroadcast();
     }

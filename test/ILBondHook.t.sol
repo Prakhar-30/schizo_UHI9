@@ -30,9 +30,6 @@ contract ILBondHookTest is BaseTest {
     int24 tickLower;
     int24 tickUpper;
 
-    // ILBondDataBundle(uint256 indexed bundleId, bytes data)
-    bytes32 constant BUNDLE_TOPIC = keccak256("ILBondDataBundle(uint256,bytes)");
-
     function setUp() public {
         deployArtifactsAndLabel();
 
@@ -41,8 +38,7 @@ contract ILBondHookTest is BaseTest {
             uint160(Hooks.AFTER_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG)
                 ^ (0x5555 << 144)
         );
-        // callbackSender = address(this) so this test can call the RC-only entrypoints.
-        bytes memory args = abi.encode(poolManager, address(this));
+        bytes memory args = abi.encode(poolManager);
         deployCodeTo("ILBondHook.sol:ILBondHook", args, flags);
         hook = ILBondHook(payable(flags));
 
@@ -118,9 +114,9 @@ contract ILBondHookTest is BaseTest {
         assertEq(hook.currentFee(idB), hook.BASE_FEE(), "B untouched -> base");
     }
 
-    // ── Multi-pool IL marking ────────────────────────────────────────────────
+    // ── Multi-pool IL marking (derived on-chain, no external dependency) ──────
 
-    function test_bundle_marksEachPositionAgainstItsOwnPoolPrice() public {
+    function test_ilMark_derivesFromEachPositionsOwnPool() public {
         (PoolKey memory keyA,) = _newPool();
         (PoolKey memory keyB,) = _newPool();
 
@@ -130,35 +126,54 @@ contract ILBondHookTest is BaseTest {
         // Move only pool A's price.
         _swap(keyA, 25e18, true);
 
-        (uint160 sqrtA,,,) = poolManager.getSlot0(keyA.toId());
-        (uint160 sqrtB,,,) = poolManager.getSlot0(keyB.toId());
+        (int256 ilA,) = hook.ilMark(pidA);
+        (int256 ilB, uint256 markB) = hook.ilMark(pidB);
 
-        vm.recordLogs();
-        hook.prepareILBondData(address(0)); // authorizedSenderOnly — this == callbackSender
-        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertLt(ilA, 0, "A shows IL after its own pool moved");
+        assertEq(ilB, 0, "B untouched by A's swap");
+        assertEq(markB, 10e18, "B's mark value == liquidity at zero IL");
 
-        ILBondHook.PositionData[] memory pts;
-        bool found;
-        for (uint256 i; i < logs.length; ++i) {
-            if (logs[i].topics[0] == BUNDLE_TOPIC) {
-                bytes memory inner = abi.decode(logs[i].data, (bytes));
-                pts = abi.decode(inner, (ILBondHook.PositionData[]));
-                found = true;
-                break;
-            }
-        }
-        assertTrue(found, "bundle emitted");
-        assertEq(pts.length, 2, "both positions in bundle");
+        // getPosition surfaces the same live mark (frontend path).
+        (,,,,,,, int256 viaGet,,) = hook.getPosition(pidA);
+        assertEq(viaGet, ilA, "getPosition returns the live derived mark");
 
-        for (uint256 i; i < pts.length; ++i) {
-            if (pts[i].positionId == pidA) {
-                assertEq(pts[i].currentSqrtPriceX96, sqrtA, "A marked at A's price");
-                assertTrue(pts[i].currentSqrtPriceX96 != pts[i].entrySqrtPriceX96, "A moved");
-            } else if (pts[i].positionId == pidB) {
-                assertEq(pts[i].currentSqrtPriceX96, sqrtB, "B marked at B's own price");
-                assertEq(pts[i].currentSqrtPriceX96, pts[i].entrySqrtPriceX96, "B unmoved");
-            }
-        }
+        // The mark derives from the SMOOTHED price, not spot: recomputing the
+        // closed form at A's smoothed marking price must match exactly.
+        (,,,,,, uint160 entryA,,,) = hook.getPosition(pidA);
+        (int256 expected,) = hook.computeILMark(entryA, hook.markSqrtPriceX96(keyA.toId()), 10e18);
+        assertEq(ilA, expected, "mark == closed form at the smoothed price");
+    }
+
+    function test_ilMark_zeroForInactiveOrUnknown() public {
+        (PoolKey memory key,) = _newPool();
+        uint256 pid = _deposit(key, 0.1e18);
+        _swap(key, 10e18, true);
+        (int256 before,) = hook.ilMark(pid);
+        assertLt(before, 0, "live position carries a mark");
+
+        hook.exitPosition(pid);
+        (int256 afterExit, uint256 mv) = hook.ilMark(pid);
+        assertEq(afterExit, 0, "exited position has no mark");
+        assertEq(mv, 0);
+
+        (int256 unknown,) = hook.ilMark(999_999);
+        assertEq(unknown, 0, "unknown id has no mark");
+    }
+
+    /// A single swap moves the smoothed marking price only a fraction of the way
+    /// to spot, so one transaction can never place the mark at a manipulated price.
+    function test_mark_isSmoothedNotSpot() public {
+        (PoolKey memory key, PoolId id) = _newPool();
+        int24 markBefore = hook.markTick(id);
+        assertEq(markBefore, 0, "mark starts at the opening tick");
+
+        _swap(key, 25e18, true); // one big price move
+        (, int24 spotTick,,) = poolManager.getSlot0(id);
+        int24 markAfter = hook.markTick(id);
+
+        assertTrue(markAfter != spotTick, "one swap must not set the mark to spot");
+        assertLt(markAfter, markBefore, "mark moves toward the trade");
+        assertGt(markAfter, spotTick, "but only partially (EWMA)");
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
@@ -207,6 +222,7 @@ contract ILBondHookTest is BaseTest {
     function testFuzz_deposit_storesParams(uint128 liq, uint256 ask) public {
         (PoolKey memory key,) = _newPool();
         liq = uint128(bound(liq, 1e12, 50e18));
+        ask = bound(ask, 1, type(uint128).max); // 0 means auto-quote, covered elsewhere
         uint256 pid = hook.depositILBond(key, tickLower, tickUpper, liq, 100e18, 100e18, ask);
         (,,, bool active,, uint128 L,,,, uint256 a) = hook.getPosition(pid);
         assertTrue(active);
@@ -228,11 +244,37 @@ contract ILBondHookTest is BaseTest {
         assertEq(hook.getClaimable(address(this), Currency.unwrap(key.currency1)), 0.3e18, "premium credited to fee holder");
     }
 
-    function test_buy_revertsZeroPremium() public {
+    function test_deposit_zeroAskAutoQuotesFromPool() public {
         (PoolKey memory key,) = _newPool();
-        uint256 pid = _deposit(key, 0);
-        vm.expectRevert(ILBondHook.InvalidPremium.selector);
-        hook.buyILBond(pid);
+        uint256 quoted = hook.quotePremium(key, tickLower, tickUpper, 10e18);
+        assertGt(quoted, 0, "live pool always quotes a nonzero premium");
+
+        uint256 pid = _deposit(key, 0); // ask == 0 -> protocol prices the risk
+        (,,,,,,,,, uint256 ask) = hook.getPosition(pid);
+        assertEq(ask, quoted, "stored ask == protocol quote");
+
+        // The quoted bond is immediately buyable at that premium.
+        _buy(key, pid, makeAddr("buyer"), ask);
+        assertEq(hook.getClaimable(address(this), Currency.unwrap(key.currency1)), ask);
+    }
+
+    function test_quotePremium_risesWithVolatility() public {
+        (PoolKey memory keyA,) = _newPool();
+        (PoolKey memory keyB,) = _newPool();
+        // Same swap on both pools so notionals stay comparable, then extra
+        // volatility only on A.
+        _swap(keyA, 10e18, true);
+        _swap(keyA, 10e18, false);
+        _swap(keyA, 10e18, true);
+        _swap(keyA, 10e18, false);
+        _swap(keyB, 10e18, true);
+        _swap(keyB, 10e18, false);
+
+        uint256 qA = hook.quotePremium(keyA, tickLower, tickUpper, 10e18);
+        uint256 qB = hook.quotePremium(keyB, tickLower, tickUpper, 10e18);
+        assertGt(qA, 0);
+        assertGt(qB, 0);
+        assertGe(qA, qB, "more realized volatility must not quote cheaper");
     }
 
     function test_buy_revertsAlreadySold() public {
@@ -357,47 +399,7 @@ contract ILBondHookTest is BaseTest {
         hook.withdraw(Currency.wrap(address(0xdead)));
     }
 
-    // ── RC-only entrypoints (access control) ──────────────────────────────────
-
-    function test_settleILMark_authorizedOnly() public {
-        (PoolKey memory key,) = _newPool();
-        uint256 pid = _deposit(key, 0.1e18);
-
-        vm.expectRevert(bytes("Authorized sender only"));
-        vm.prank(makeAddr("stranger"));
-        hook.settleILMark(address(0), pid, -150, 9e18);
-
-        hook.settleILMark(address(0), pid, -150, 9e18); // this == callbackSender
-        (,,,,,,, int256 ilBps, uint256 mark,) = hook.getPosition(pid);
-        assertEq(ilBps, -150);
-        assertEq(mark, 9e18);
-    }
-
-    function test_settleILMark_inactiveIsNoOp() public {
-        (PoolKey memory key,) = _newPool();
-        uint256 pid = _deposit(key, 0.1e18);
-        hook.exitPosition(pid);
-        hook.settleILMark(address(0), pid, -777, 1e18); // no revert, no effect
-        (,,,,,,, int256 ilBps,,) = hook.getPosition(pid);
-        assertEq(ilBps, 0, "inactive position mark untouched");
-    }
-
-    function test_prepareILBondData_authorizedOnly() public {
-        vm.expectRevert(bytes("Authorized sender only"));
-        vm.prank(makeAddr("stranger"));
-        hook.prepareILBondData(address(0));
-    }
-
-    function test_prepareILBondData_emptyEmitsCycle() public {
-        vm.recordLogs();
-        hook.prepareILBondData(address(0)); // no active positions
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        bool found;
-        for (uint256 i; i < logs.length; ++i) {
-            if (logs[i].topics[0] == keccak256("CycleCompleted(uint256,uint256)")) found = true;
-        }
-        assertTrue(found, "empty cycle emits CycleCompleted");
-    }
+    // ── unlock callback access control ────────────────────────────────────────
 
     function test_unlockCallback_onlyPoolManager() public {
         vm.expectRevert(ILBondHook.OnlyPoolManager.selector);
@@ -427,4 +429,137 @@ contract ILBondHookTest is BaseTest {
         assertGe(f, hook.BASE_FEE());
         assertLe(f, hook.MAX_FEE());
     }
+
+    // ── fee routing: FEE-T earns the swap fees, IL-T earns the principal ──────
+
+    function test_exit_routesFeesToFeeHolder_principalToILHolder() public {
+        (PoolKey memory key,) = _newPool();
+        address t0 = Currency.unwrap(key.currency0);
+        address t1 = Currency.unwrap(key.currency1);
+
+        uint256 pid = _deposit(key, 0.3e18);
+        address buyer = makeAddr("buyer");
+        _buy(key, pid, buyer, 0.3e18); // buyer holds IL-T; this holds FEE-T
+
+        // Generate real swap fees in both tokens.
+        _swap(key, 5e18, true);
+        _swap(key, 5e18, false);
+
+        uint256 premium = hook.getClaimable(address(this), t1);
+        assertEq(premium, 0.3e18, "premium credited before exit");
+
+        hook.exitPosition(pid);
+
+        // FEE-T holder receives the accrued swap fees on top of the premium.
+        assertGt(hook.getClaimable(address(this), t0), 0, "fee leg earns token0 fees");
+        assertGt(hook.getClaimable(address(this), t1), premium, "fee leg earns token1 fees beyond premium");
+        // IL-T holder receives the principal in both tokens.
+        assertGt(hook.getClaimable(buyer, t0), 0, "risk leg gets principal token0");
+        assertGt(hook.getClaimable(buyer, t1), 0, "risk leg gets principal token1");
+    }
+
+    function test_exit_noSwaps_noFees_principalOnly() public {
+        (PoolKey memory key,) = _newPool();
+        address t0 = Currency.unwrap(key.currency0);
+        uint256 pid = _deposit(key, 0.3e18);
+        address buyer = makeAddr("buyer");
+        _buy(key, pid, buyer, 0.3e18);
+
+        hook.exitPosition(pid);
+
+        assertEq(hook.getClaimable(address(this), t0), 0, "no swaps -> no token0 fees for FEE-T");
+        assertGt(hook.getClaimable(buyer, t0), 0, "principal still goes to IL-T");
+    }
+
+    function test_collectFees_harvestsWithoutClosing() public {
+        (PoolKey memory key,) = _newPool();
+        address t0 = Currency.unwrap(key.currency0);
+        address t1 = Currency.unwrap(key.currency1);
+        uint256 pid = _deposit(key, 0.2e18);
+
+        _swap(key, 5e18, true);
+        _swap(key, 5e18, false);
+
+        (uint256 f0, uint256 f1) = hook.collectFees(pid);
+        assertGt(f0 + f1, 0, "fees harvested");
+        assertEq(hook.getClaimable(address(this), t0), f0, "token0 fees credited to FEE-T holder");
+        assertEq(hook.getClaimable(address(this), t1), f1, "token1 fees credited to FEE-T holder");
+        assertTrue(_active(pid), "position stays open");
+
+        // Nothing double-counted: an immediate second harvest yields nothing.
+        (uint256 g0, uint256 g1) = hook.collectFees(pid);
+        assertEq(g0 + g1, 0, "no fees accrue between harvests");
+
+        // No swaps happened since the harvest, so exit adds principal only
+        // (this == ilHolder here) and no further fees.
+        uint256 claim0Before = hook.getClaimable(address(this), t0);
+        hook.exitPosition(pid);
+        assertGt(hook.getClaimable(address(this), t0), claim0Before, "principal credited at exit");
+    }
+
+    function test_collectFees_revertsInactive() public {
+        (PoolKey memory key,) = _newPool();
+        uint256 pid = _deposit(key, 0.1e18);
+        hook.exitPosition(pid);
+        vm.expectRevert(ILBondHook.PositionNotActive.selector);
+        hook.collectFees(pid);
+    }
+
+    // ── full-range enforcement (keeps the RSC's IL formula exact) ─────────────
+
+    function test_deposit_revertsNonFullRange() public {
+        (PoolKey memory key,) = _newPool();
+        vm.expectRevert(ILBondHook.FullRangeOnly.selector);
+        hook.depositILBond(key, -600, 600, 1e18, 1e18, 1e18, 1);
+    }
+
+    // ── leg transfers reject the zero address ─────────────────────────────────
+
+    function test_transfers_rejectZeroAddress() public {
+        (PoolKey memory key,) = _newPool();
+        uint256 pid = _deposit(key, 0.1e18);
+        vm.expectRevert(ILBondHook.ZeroAddress.selector);
+        hook.transferFeeToken(pid, address(0));
+        vm.expectRevert(ILBondHook.ZeroAddress.selector);
+        hook.transferILToken(pid, address(0));
+    }
+
+    // ── native (ETH) pools: deposit, exit, withdraw ───────────────────────────
+
+    function _newNativePool() internal returns (PoolKey memory key) {
+        (Currency c0, Currency c1) = deployCurrencyPair();
+        // native ETH is currency0 (address(0) sorts first); reuse c1 as the token
+        key = PoolKey(CurrencyLibrary.ADDRESS_ZERO, c1, LPFeeLibrary.DYNAMIC_FEE_FLAG, 60, IHooks(address(hook)));
+        poolManager.initialize(key, Constants.SQRT_PRICE_1_1);
+        IERC20Minimal(Currency.unwrap(c1)).approve(address(hook), type(uint256).max);
+        c0; // silence unused
+    }
+
+    function test_nativePool_depositExitWithdraw() public {
+        PoolKey memory key = _newNativePool();
+        vm.deal(address(this), 10e18);
+
+        uint256 ethBefore = address(this).balance;
+        uint256 pid = hook.depositILBond{value: 2e18}(key, tickLower, tickUpper, 1e18, 2e18, 2e18, 0.1e18);
+        // Unused ETH is refunded immediately.
+        assertGt(address(this).balance, ethBefore - 2e18, "unused ETH refunded");
+
+        hook.exitPosition(pid);
+        uint256 owedEth = hook.getClaimable(address(this), address(0));
+        assertGt(owedEth, 0, "native principal claimable");
+
+        uint256 balBefore = address(this).balance;
+        hook.withdraw(CurrencyLibrary.ADDRESS_ZERO);
+        assertEq(address(this).balance, balBefore + owedEth, "ETH actually paid out on withdraw");
+        assertEq(hook.getClaimable(address(this), address(0)), 0, "claim zeroed");
+    }
+
+    function test_nativePool_depositRevertsWrongValue() public {
+        PoolKey memory key = _newNativePool();
+        vm.deal(address(this), 10e18);
+        vm.expectRevert(ILBondHook.WrongNativeAmount.selector);
+        hook.depositILBond{value: 1e18}(key, tickLower, tickUpper, 1e18, 2e18, 2e18, 0.1e18);
+    }
+
+    receive() external payable {}
 }

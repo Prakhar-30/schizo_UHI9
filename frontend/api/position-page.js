@@ -1,4 +1,4 @@
-// Edge function that serves /positions/:id — fetches the SPA shell from
+// Edge function that serves /positions/:id - fetches the SPA shell from
 // /index.html and rewrites the <head> with per-position OG / Twitter Card
 // meta tags so X / Telegram / Discord crawlers (which DON'T run JS) can
 // unfurl a proper card.
@@ -18,7 +18,7 @@ export default async function handler(req) {
   const origin = url.origin
 
   // Pull the static SPA shell. The internal fetch hits the static-file
-  // serving layer (no rewrite recursion — /index.html is on disk).
+  // serving layer (no rewrite recursion - /index.html is on disk).
   let html
   try {
     const res = await fetch(origin + '/index.html', {
@@ -41,7 +41,7 @@ export default async function handler(req) {
   const ogImage = origin + '/api/og?id=' + id + (v ? '&v=' + v : '') + (chain ? '&chain=' + chain : '')
   const title = 'Position #' + id + ' · schizō'
   const desc =
-    'IL bond on schizō. Live impermanent-loss mark posted by the Reactive Network on every swap.'
+    'IL bond on schizō. Live impermanent-loss mark derived on-chain by the hook on every swap.'
   const canonical = origin + '/positions/' + id
 
   const meta = `

@@ -5,8 +5,8 @@ import { Kicker } from './ui/Bits'
 
 /**
  * Outcome calculator: for a set of price-move scenarios, compute what the
- * impermanent-loss mark would become — relative to the position's entry
- * price, not the current price. Lets a hunter eyeball the *shape* of the
+ * impermanent-loss mark would become - relative to the position's entry
+ * price, not the current price. Lets an underwriter eyeball the *shape* of the
  * risk they're buying.
  */
 const SCENARIOS = [
@@ -31,7 +31,7 @@ function fmtPrice(p) {
 
 /**
  * The price band (entry-anchored) within which accrued IL stays *smaller* than
- * the premium the hunter paid — i.e. the buffer the premium buys. Because the
+ * the premium the underwriter paid - i.e. the buffer the premium buys. Because the
  * IL curve is symmetric (IL(r) = IL(1/r)), the band is symmetric in ratio
  * around the entry price. Solving 1 − 2√r/(1+r) = ilBE for r:
  *   x = √r,  x = (1 ± √(1−k²)) / k   with  k = 1 − ilBE
@@ -188,7 +188,7 @@ export default function OutcomeStrip({
       )}
       {!compact && (
         <p className="mt-3 font-mono text-[10px] text-bone/35">
-          IL is the loss vs holding the two tokens unchanged — your premium is your edge against it.
+          IL is the loss vs holding the two tokens unchanged; your premium is your edge against it.
         </p>
       )}
     </div>

@@ -1,13 +1,6 @@
-// ───────────────────────────────────────────────────────────────────────────
-//  Uniswap v4 exact-input quoting (single active-liquidity range), in BigInt.
-//
-//  Mirrors SqrtPriceMath + SwapMath.computeSwapStep for one step with the pool's
-//  current active liquidity L held constant across the price move. This is EXACT
-//  whenever the swap doesn't cross out of the current initialized tick range —
-//  which is always the case for full-range liquidity (the template's default LP
-//  range). For swaps that would cross initialized ticks it's a close estimate
-//  (it doesn't re-load L at crossings), still far better than a spot quote.
-// ───────────────────────────────────────────────────────────────────────────
+// Uniswap v4 exact-input quoting in BigInt: SqrtPriceMath + SwapMath for one
+// step with L held constant. Exact for full-range liquidity (no tick crossings),
+// a close estimate otherwise.
 
 const Q96 = 2n ** 96n
 const FEE_DENOM = 1_000_000n // v4 fee unit: 1e6 = 100%

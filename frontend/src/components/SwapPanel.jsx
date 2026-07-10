@@ -123,7 +123,7 @@ export default function SwapPanel({ onSwapped }) {
       },
       {
         pendingMsg: `Swapping ${symIn} → ${symOut}…`,
-        successMsg: 'Swap landed — the RSC will re-mark IL',
+        successMsg: 'Swap landed. Every position just re-marked',
         onSuccess: () => {
           refetch()
           onSwapped?.()
@@ -135,15 +135,14 @@ export default function SwapPanel({ onSwapped }) {
   return (
     <Card glow="volt" className="p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Kicker>Drive the oracle</Kicker>
+        <Kicker>Drive the mark</Kicker>
         <Chip color="volt">
-          <Dot color="volt" pulse /> triggers RSC
+          <Dot color="volt" pulse /> moves the mark
         </Chip>
       </div>
 
       <PoolSelector className="mt-4" />
 
-      {/* live dynamic fee for this pool */}
       <div className="mt-3 flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
         <span className="font-mono text-[11px] uppercase tracking-wider text-bone/45">Live fee</span>
         <span

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useAccount, usePublicClient } from 'wagmi'
 import { Link } from 'react-router-dom'
 import { maxUint256 } from 'viem'
-import { usePositions, useHookCounters, useReactiveStatus } from '../hooks/reads'
+import { usePositions, useHookCounters, useMarkCount } from '../hooks/reads'
 import OutcomeStrip from '../components/OutcomeStrip'
 import { fmtToken, fmtCompact, isSameAddr } from '../lib/format'
 import { HOOK_ABI, ERC20_ABI } from '../config/contracts'
@@ -24,7 +24,7 @@ const SORTS = [
   { key: 'newest', label: 'Newest position' },
 ]
 
-function HuntRow({ position, marked, busyId, onBuy }) {
+function HuntRow({ position, busyId, onBuy }) {
   const net = useNetwork()
   const { id, lp, askPremium, ilMarkBps, liveIlBps, liquidity, entrySqrtPriceX96 } = position
   const busy = busyId === id
@@ -35,18 +35,15 @@ function HuntRow({ position, marked, busyId, onBuy }) {
   return (
     <Card className="flex flex-col gap-4 p-4 transition-colors hover:border-volt/30 sm:p-5">
       <div className="flex flex-col gap-4 md:flex-row md:items-center">
-        {/* id + pool */}
         <Link to={`/positions/${id}`} className="flex items-center gap-3 hover:text-volt md:w-36">
           <span className="font-black text-2xl">#{id}</span>
-          <Chip color="volt">{position.pool?.label || '—'}</Chip>
+          <Chip color="volt">{position.pool?.label || '–'}</Chip>
         </Link>
 
-        {/* IL gauge */}
         <div className="md:w-52">
-          <ILGauge ilMarkBps={displayIl} marked={marked} compact />
+          <ILGauge ilMarkBps={displayIl} compact />
         </div>
 
-        {/* numbers */}
         <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3">
           <div className="min-w-0">
             <p className="kicker truncate">Premium</p>
@@ -64,7 +61,6 @@ function HuntRow({ position, marked, busyId, onBuy }) {
           </div>
         </div>
 
-        {/* action */}
         <div className="md:w-44">
           <Button variant="risk" size="md" className="w-full" loading={busy} onClick={() => onBuy(position)}>
             Buy IL-T
@@ -72,7 +68,6 @@ function HuntRow({ position, marked, busyId, onBuy }) {
         </div>
       </div>
 
-      {/* outcome math (collapsible) */}
       <div>
         <button
           onClick={() => setOpen((v) => !v)}
@@ -103,8 +98,8 @@ export default function Hunt() {
   const { address, isConnected } = useAccount()
   const publicClient = usePublicClient({ chainId: net.chainId })
   const { positions, isLoading, refetch } = usePositions()
-  const { nextId, activeCount, bundles } = useHookCounters()
-  const rsc = useReactiveStatus()
+  const { nextId, activeCount } = useHookCounters()
+  const { count: markCount } = useMarkCount()
   const { run, pending } = useTx()
   const [busyId, setBusyId] = useState(null)
   const [sort, setSort] = useState('premium-asc')
@@ -187,16 +182,15 @@ export default function Hunt() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
-      {/* header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <Kicker>Hunt mode</Kicker>
+          <Kicker>Underwriting desk</Kicker>
           <h1 className="mt-2 font-black text-balance text-3xl tracking-tight sm:text-5xl">
-            Buyable <span className="text-risk">IL-T</span> bonds
+            Open <span className="text-risk">IL-T</span> bonds
           </h1>
           <p className="mt-3 max-w-2xl text-sm text-bone/55 sm:text-base">
-            Every open position whose risk leg hasn't been sold yet — collected in one place. Pick a premium, take the
-            price risk, collect the LP composition on exit.
+            Every open position whose risk leg still needs a counterparty, collected in one place. Earn the premium,
+            warehouse the price risk, collect the LP composition on exit.
           </p>
         </div>
         <Link
@@ -207,25 +201,23 @@ export default function Hunt() {
         </Link>
       </div>
 
-      {/* stats */}
       <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
         <Stat
-          label="Open to buy"
+          label="Open to underwrite"
           value={buyable.length.toString()}
           sub={`of ${positions.filter((p) => p.active).length} active`}
           accent="amber"
         />
-        <Stat label="Active bonds" value={activeCount !== undefined ? activeCount.toString() : '—'} accent="yield" />
+        <Stat label="Active bonds" value={activeCount !== undefined ? activeCount.toString() : '–'} accent="yield" />
         <Stat label="Pools" value={net.pools.length.toString()} sub="dynamic-fee markets" accent="mint" />
         <Stat
-          label="RSC marks posted"
-          value={bundles !== undefined ? bundles.toString() : '—'}
-          sub={rsc.online ? 'reactive online' : 'reactive syncing'}
+          label="Marks posted"
+          value={markCount !== undefined ? markCount.toString() : '–'}
+          sub="one per swap, in-hook"
           accent="volt"
         />
       </div>
 
-      {/* controls */}
       <div className="mt-8 flex flex-col gap-3 rounded-2xl border border-white/10 bg-ink-soft/40 p-4 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="w-full flex-1 sm:min-w-[14rem]">
           <Input
@@ -264,7 +256,6 @@ export default function Hunt() {
         </div>
       </div>
 
-      {/* connect notice */}
       {!isConnected && (
         <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-volt/30 bg-volt/5 px-4 py-3">
           <p className="text-sm text-bone/70">Connect a wallet to buy a bond. Reading the book works without one.</p>
@@ -272,7 +263,6 @@ export default function Hunt() {
         </div>
       )}
 
-      {/* list */}
       <div className="mt-6">
         {isLoading ? (
           <div className="flex items-center gap-2 font-mono text-sm text-bone/40">
@@ -302,7 +292,6 @@ export default function Hunt() {
               <HuntRow
                 key={p.id}
                 position={p}
-                marked={bundles > 0n}
                 busyId={pending ? busyId : null}
                 onBuy={handleBuy}
               />
@@ -311,15 +300,15 @@ export default function Hunt() {
         )}
       </div>
 
-      {/* footer helper */}
       <div className="mt-10 rounded-2xl border border-white/10 bg-ink-soft/30 p-5 sm:mt-12 sm:p-6">
         <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
           <div className="max-w-xl">
-            <Kicker>What you're buying</Kicker>
+            <Kicker>What you're underwriting</Kicker>
             <p className="mt-2 text-sm leading-relaxed text-bone/60">
-              When you buy <Leg kind="il" className="mx-0.5" />, you pay the LP an upfront premium in the pool's quote token. In return,
-              you take the underlying LP composition — and the impermanent loss with it. The Reactive Network re-prices
-              your exposure after every swap, so you always see the live mark.
+              When you take <Leg kind="il" className="mx-0.5" />, you pay the LP an upfront premium in the pool's quote token
+              and they are hedged from that moment. In return you hold the underlying LP composition, impermanent loss
+              included: the same trade an insurer runs, priced off volatility. The hook re-derives your exposure from
+              its smoothed marking price on every read, so you always see the live mark.
             </p>
           </div>
           <Button to="/markets" variant="outline" size="md" className="w-full md:w-auto">

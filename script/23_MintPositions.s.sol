@@ -14,7 +14,7 @@ import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol
 import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 import {ILBondHook} from "../src/ILBondHook.sol";
 
-/// @notice Mints IL-bond positions (LP = broadcaster) on a few pools so the RSC
+/// @notice Mints IL-bond positions (LP = broadcaster) on a few pools so the hook
 ///         has positions to mark. Buyers take the IL-T leg separately (cast).
 contract MintPositions is Script {
     using PoolIdLibrary for PoolKey;
@@ -23,7 +23,7 @@ contract MintPositions is Script {
     uint24 constant DYN = LPFeeLibrary.DYNAMIC_FEE_FLAG;
     int24 constant SPACING = 60;
     IPoolManager constant PM = IPoolManager(0xE03A1074c86CFeDd5C142C4F04F1a1536e203543);
-    ILBondHook constant HOOK = ILBondHook(payable(0x9D19eA2aad6c8748d566f28fe375fb8BCAA350c0));
+    ILBondHook constant HOOK = ILBondHook(payable(0x57696AB5077Aa634c13682C3d3E84287935290c0));
 
     address constant WETH = 0x748b5C9623528D346C414F4f236B3b5b5c7683cb;
     address constant WBTC = 0x912A7Fb66391eAe95DDee40B664FF497108580CD;

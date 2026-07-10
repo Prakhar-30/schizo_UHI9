@@ -15,7 +15,7 @@ export default function ILGauge({ ilMarkBps, marked = true, compact = false }) {
   const pct = Math.max(2, sev * 100)
   const color = sevColor(sev)
 
-  // Flash when the RSC posts a fresh mark — makes "reactive on every swap" visible.
+  // Flash when the mark moves - makes "re-marked on every swap" visible.
   const prev = useRef(null)
   const [flash, setFlash] = useState(false)
   useEffect(() => {

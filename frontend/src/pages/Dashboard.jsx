@@ -36,7 +36,6 @@ export default function Dashboard() {
   const { address, isConnected } = useAccount()
   const { positions, refetch: refetchPositions } = usePositions()
   const { claims, refetch: refetchClaims } = useClaimable(address)
-  const { bundles } = useHookCounters()
   const { run, pending } = useTx()
 
   const mine = useMemo(
@@ -84,7 +83,6 @@ export default function Dashboard() {
         </Button>
       </div>
 
-      {/* stats */}
       <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Your bonds" value={mine.length.toString()} />
         <Stat label="FEE-T held" value={feeLegs.toString()} accent="yield" sub="active yield legs" />
@@ -92,9 +90,7 @@ export default function Dashboard() {
         <Stat label="Token claims" value={claims.length.toString()} accent="mint" sub="tokens to withdraw" />
       </div>
 
-      {/* claimable + cast your bonds — side by side, each only as tall as it needs */}
       <div className={`mt-6 grid gap-6 lg:items-start ${showShare ? 'lg:grid-cols-[1.35fr_1fr]' : ''}`}>
-        {/* claimable */}
         <Card className="p-5 sm:p-6">
           <div className="flex items-center justify-between gap-2">
             <Kicker>Claimable from the hook</Kicker>
@@ -118,13 +114,12 @@ export default function Dashboard() {
                 </div>
               ))}
               <p className="pt-1 font-mono text-[11px] text-bone/40">
-                claims are paid per token — each button sends exactly that token's balance to your wallet.
+                claims are paid per token: each button sends exactly that token's balance to your wallet.
               </p>
             </div>
           )}
         </Card>
 
-        {/* cast your bonds */}
         {showShare && (
           <Card className="p-5 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -152,7 +147,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* my positions */}
       <div className="mt-10">
         <SectionHead
           kicker="Holdings"
@@ -182,7 +176,7 @@ export default function Dashboard() {
                     {isSameAddr(address, p.feeHolder) && <Leg kind="fee" />}
                     {isSameAddr(address, p.ilHolder) && <Leg kind="il" />}
                   </div>
-                  <PositionCard position={p} marked={bundles > 0n} onAction={() => { refetchPositions(); refetchClaims(); }} />
+                  <PositionCard position={p} onAction={() => { refetchPositions(); refetchClaims(); }} />
                 </div>
               ))}
           </div>

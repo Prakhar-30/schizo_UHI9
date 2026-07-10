@@ -37,7 +37,7 @@ const POOL_ID = keccak256(
 const HOOK_ABI = parseAbi([
   'function nextPositionId() view returns (uint256)',
   'function activePositionCount() view returns (uint256)',
-  'function bundleCounter() view returns (uint256)',
+  'function VERSION() view returns (uint256)',
   'function BASE_FEE() view returns (uint24)',
   'function getPosition(uint256 positionId) view returns (address lp, address feeHolder, address ilHolder, bool active, bool ilBondSold, uint128 liquidity, uint160 entrySqrtPriceX96, int256 ilMarkBps, uint256 markValue, uint256 askPremium)',
 ])
@@ -52,13 +52,13 @@ const sv = (functionName, args) => client.readContract({ address: ADDR.stateView
 console.log('POOL_ID:', POOL_ID)
 console.log('block  :', (await client.getBlockNumber()).toString())
 
-const [nextId, active, bundles, baseFee] = await Promise.all([
-  hook('nextPositionId'), hook('activePositionCount'), hook('bundleCounter'), hook('BASE_FEE'),
+const [nextId, active, version, baseFee] = await Promise.all([
+  hook('nextPositionId'), hook('activePositionCount'), hook('VERSION'), hook('BASE_FEE'),
 ])
 console.log('\n── HOOK STATE ───────────────────────────────')
 console.log('nextPositionId     :', nextId.toString())
 console.log('activePositionCount:', active.toString())
-console.log('bundleCounter      :', bundles.toString())
+console.log('VERSION            :', version.toString())
 console.log('BASE_FEE (pips)    :', baseFee.toString(), `( ${Number(baseFee) / 10000}% )`)
 
 const [slot0, liq] = await Promise.all([ sv('getSlot0', [POOL_ID]), sv('getLiquidity', [POOL_ID]) ])

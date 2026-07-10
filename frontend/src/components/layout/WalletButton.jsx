@@ -35,7 +35,7 @@ export default function WalletButton({ size = 'sm' }) {
                     title="Switch network"
                   >
                     <span className={`h-1.5 w-1.5 rounded-full ${chain.id === 11155111 ? 'bg-mint' : 'bg-volt'}`} />
-                    {chain.name?.replace('Reactive ', '')}
+                    {chain.name}
                   </button>
                   <Button variant="outline" size={size} onClick={openAccountModal} className="max-w-[9rem] truncate sm:max-w-none">
                     {account.displayName}

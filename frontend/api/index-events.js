@@ -9,7 +9,7 @@
 //   • later runs scan only from that chain's last indexed block → head
 //
 //  Rows are tagged with hook_address (unique per chain), so the two deployments
-//  share one table yet stay fully isolated — the frontend filters by hook.
+//  share one table yet stay fully isolated - the frontend filters by hook.
 //  Each chain keeps its own indexer_state cursor, so they resume independently.
 //
 //  Triggered by a Vercel cron (see vercel.json) and nudged from the client.
@@ -34,35 +34,35 @@ const NETWORKS = [
   {
     chainId: 11155111,
     chain: sepolia,
-    // Sepolia — v3 fresh deployment (45 pairs).
-    hook: '0x58A3A816864F1E5f6F38F01f9f5AE1Cacc9210C0',
+    // Sepolia - v5 self-marking deployment (45 pairs).
+    hook: '0x57696AB5077Aa634c13682C3d3E84287935290c0',
     poolManager: '0xE03A1074c86CFeDd5C142C4F04F1a1536e203543',
-    deployBlock: 11008000n,
+    deployBlock: 11239703n,
     rpc: process.env.LOG_RPC || process.env.VITE_LOG_RPC || process.env.SEPOLIA_RPC || 'https://ethereum-sepolia-rpc.publicnode.com',
-    stateId: 'ilbondhook_v3',
+    stateId: 'ilbondhook_v5',
   },
   {
     chainId: 1301,
     chain: unichainSepolia,
-    // Unichain Sepolia — second, independent deployment (mock tokens, fresh hook).
-    hook: '0x56B99A42E41D5987b2F39E97F3EBe5f3d76e10C0',
+    // Unichain Sepolia - second, independent v5 deployment (mock tokens, fresh hook).
+    hook: '0x20487A756FececfF800d15EC76C78e0487A2D0c0',
     poolManager: '0x00B036B58a818B1BC34d502D3fE730Db729e62AC',
-    deployBlock: 54154700n,
+    deployBlock: 56790639n,
     rpc: process.env.UNICHAIN_RPC || process.env.VITE_UNICHAIN_RPC || 'https://sepolia.unichain.org',
-    stateId: 'ilbondhook_unichain_v1',
+    stateId: 'ilbondhook_unichain_v5',
   },
 ]
 
 const HOOK_ABI = parseAbi([
-  'event SwapOccurred(bytes32 indexed poolId, uint160 sqrtPriceX96, int24 tick, uint128 liquidity)',
+  // v5 hook: SwapOccurred carries the smoothed marking price, so the full IL
+  // history rebuilds from swap events alone. No mark-settlement events exist.
+  'event SwapOccurred(bytes32 indexed poolId, uint160 sqrtPriceX96, int24 tick, uint128 liquidity, uint160 markSqrtPriceX96)',
   'event PositionCreated(uint256 indexed positionId, address indexed owner, uint160 entrySqrtPriceX96)',
   'event PositionExited(uint256 indexed positionId)',
   'event ILBondSold(uint256 indexed positionId, address indexed buyer, uint256 premium)',
-  'event ILMarkUpdated(uint256 indexed positionId, int256 ilBps, uint256 markValue)',
+  'event FeesCollected(uint256 indexed positionId, address indexed feeHolder, uint256 amount0, uint256 amount1)',
   'event FeeTokenTransferred(uint256 indexed positionId, address indexed from, address indexed to)',
   'event ILTokenTransferred(uint256 indexed positionId, address indexed from, address indexed to)',
-  'event ILBondDataBundle(uint256 indexed bundleId, bytes data)',
-  'event CycleCompleted(uint256 timestamp, uint256 positionsChecked)',
 ])
 
 // PoolManager event we use only to recover each position's poolId (the hook's

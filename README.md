@@ -1,10 +1,12 @@
-# schizō — Impermanent loss, unbundled
+# schizō: Hedge impermanent loss. Keep the yield.
 
-**A Uniswap v4 hook that splits every LP position into a yield leg (FEE-T) and a risk leg (IL-T) — with the impermanent-loss mark recomputed on every swap by a Reactive Smart Contract, no keeper and no cron.**
+**A single Uniswap v4 hook that splits every LP position into a hedged yield leg (FEE-T) and a risk leg (IL-T), with the risk leg marked to market by the hook itself on every swap. No oracle, no keeper, no off-chain anything.**
 
-Live app → https://schizo-il-bond.vercel.app · Built for UHI9 (Theme: Impermanent Loss) · Uniswap v4 + Reactive Network
+Live app: https://schizo-il-bond.vercel.app · Built for UHI9 (Theme: Impermanent Loss) · Uniswap v4
 
-> **This repository is a fork of the Uniswap [`v4-template`](https://github.com/uniswapfoundation/v4-template)** — the official scaffolding for designing and building Uniswap v4 hooks. We used it as the foundation (PoolManager / PositionManager wiring, `HookMiner` salt-mining, and the Foundry test harness) and built the entire ILBondHook system on top of it.
+> **This repository is a fork of the Uniswap [`v4-template`](https://github.com/uniswapfoundation/v4-template)**, the official scaffolding for building v4 hooks. We used it for the PoolManager / PositionManager wiring, `HookMiner` salt-mining, and the Foundry harness, and built the entire ILBondHook system on top of it.
+
+> **UHI9 result:** schizō won a prize at the UHI9 Hookathon. The judge scored Original Idea and Unique Execution at 4.5/5 each, and wrote that marking the risk leg to market on every swap turns the IL-T into "a live, tradeable bond instead of a number you only learn at exit." The one thing they asked us to confirm, that the on-chain mark can't be skewed by a same-transaction price move, is now enforced in-protocol. See "The mark is manipulation-resistant" below.
 
 ---
 
@@ -14,108 +16,95 @@ Live app → https://schizo-il-bond.vercel.app · Built for UHI9 (Theme: Imperma
 
 A Uniswap LP position is really two unrelated exposures stapled together:
 
-- **Fee income** — steady, vol-positive, grows with trading volume.
-- **Impermanent loss** — vol-negative, the bill you pay whenever the price moves.
+- **Fee income**: steady, grows with trading volume.
+- **Impermanent loss**: the bill you pay whenever price moves. It is the single biggest reason capital leaves AMMs.
 
-Nobody asked for them bundled. A DAO treasury that wants yield doesn't want the price risk; a trader who wants to bet on volatility doesn't want to babysit a position. Uniswap hands everyone the same package anyway.
+These belong to different owners. A DAO treasury wants the yield and would pay to make the price risk disappear. A market-making desk that is long volatility elsewhere would happily absorb that same risk at the right price, because it offsets their book. Uniswap forces both of them to hold the identical bundle, so neither shows up.
 
 **schizō unbundles the position at deposit time into two transferable claims on the same liquidity:**
 
-| Leg | What it holds | Who wants it |
+| Leg | What it holds | Who holds it |
 |-----|---------------|--------------|
-| **FEE-T** | swap fees **+** an upfront premium · **zero price risk** | yield seekers, treasuries |
-| **IL-T** | the impermanent-loss P&L (for or against) · pays the premium | volatility traders, speculators |
+| **FEE-T** | swap fees **+** an upfront premium · **zero price risk** | the hedged LP: treasuries, desks, passive capital |
+| **IL-T** | the LP principal and its impermanent-loss outcome | the underwriter: desks hedging long-vol books, funds earning risk premium |
 
-Hold both legs → you're a normal LP. Sell **IL-T** → you earn yield with the risk handed off. Sell **FEE-T** → you hold a pure, leveraged bet on volatility. One deposit, two instruments, two audiences. **IL stops being a tax and becomes something you can price, buy, and sell.**
+Hold both legs and you are a normal LP. Sell **IL-T** and you have hedged your impermanent loss: you keep the fees and the premium, and the price risk belongs to someone who priced it and wanted it. This is the same move fixed-income markets made when they stripped bonds into principal and coupon, and the same move Pendle made for yield. Nobody had made it for impermanent loss. **IL stops being a tax and becomes a hedge you can buy and a premium you can earn.**
 
 ### Why it's unique
 
-- **Everyone else *reduces* IL — we *separate* it.** Dynamic-fee hooks, rebalancing, insurance pools, and LVR auctions all keep the LP holding the risk and try to soften it. schizō cuts the position in half and lets the two halves trade independently. That's the difference between *tranching a bond* and *inventing the credit-default swap*.
-- **Not a derivative — a slice of the position itself.** Options-on-LP write a contract *next to* a position. IL-T **is** the position's downside leg, settled from the real underlying on exit.
-- **Fully bilateral — no capital pool.** Insurance hooks need a float to pay claims. schizō needs nothing but a willing counterparty and an upfront premium.
-- **The risk leg is kept honest autonomously.** IL is a function of price, and price only moves on swaps — so the mark must update on every swap, per position, against its own entry price. A **Reactive Smart Contract** does exactly that, with no off-chain bot to trust and no timer burning gas. This product does not exist without it.
-- **Genuinely dynamic fees.** Each pool charges `0.30% + f(realized volatility)`, capped at 3%, driven by an on-chain EWMA of tick movement — verified climbing under load and decaying when calm. (Most "dynamic fee" demos ship a constant in disguise.)
+- **Everyone else *reduces* IL. We let you *hedge* it.** Dynamic-fee hooks, rebalancing, insurance pools and LVR auctions all leave the LP holding the risk and try to soften it. schizō moves the risk, whole, to a counterparty who wants it, and pays the LP for the transfer. That is what a real hedge is.
+- **Not a derivative. A slice of the position itself.** Options-on-LP write a contract next to a position. IL-T *is* the position's risk leg, settled from the real underlying at exit. There is no oracle to trust and no synthetic to unwind.
+- **Fully bilateral, no capital pool.** Insurance hooks need a float to pay claims. schizō needs nothing but a counterparty and a premium. The books always balance because the two legs are two halves of one real position.
+- **The protocol prices the hedge itself.** Pass an ask of zero and `quotePremium` derives a fair premium on-chain from the pool's live realized volatility, the range width, and the position's notional. No hand-typed numbers, no off-chain vol oracle.
+- **The risk leg keeps itself honest.** IL is a function of price, and the hook sees every price change, because every price change *is* a swap through it. So the hook maintains a smoothed marking price per pool in `afterSwap` (two storage writes) and derives each position's IL from it at read time with one pure function. Nothing to run, nothing to fund, nothing to trust. The entire marking system is ~40 lines inside the hook.
+- **The mark is manipulation-resistant.** Two layers, both structural: the marking price is an EWMA-smoothed tick, so a single swap moves the mark only a quarter of the way to its own price. And the mark is never *stored* per position, it is derived on demand, so there is no stale value to poison and no settlement transaction to front-run. An attacker has to hold a skewed price across many swaps and pay arbitrageurs the whole way. This directly answers the one open question from the UHI9 judges.
+- **FEE-T is a real claim on real fees.** At exit the hook splits `feesAccrued` from principal: swap fees route to the FEE-T holder, the underlying routes to the IL-T holder. `collectFees` harvests accrued fees to the FEE-T holder any time, without closing the position.
+- **Genuinely dynamic fees.** Each pool charges `0.30% + f(realized volatility)`, capped at 3%, driven by an on-chain EWMA of tick movement. Verified climbing under load and decaying when calm, so LPs get paid most exactly when IL risk is highest.
 
-### Partner integrations
+### Where marking lives, and why
 
-schizō was built to qualify across **all three** tracks at once — each is load-bearing, not bolted on:
-
-| Track | How schizō integrates it | Why it qualifies |
-|-------|--------------------------|------------------|
-| **Open track** | A novel Uniswap **v4 hook** that addresses the IL theme by *tranching* the position (FEE-T / IL-T) rather than reducing IL — with real dynamic fees in `beforeSwap`, real full-range liquidity minted via `unlock`/`modifyLiquidity`, and 74 passing Foundry tests. | A complete, original v4-hook product end to end: contracts → indexer → production app. |
-| **Unichain** | The **entire system is deployed independently on Unichain Sepolia (1301)** — its own ILBondHook, its own Reactive contract, fresh mock tokens, its own pools and positions. The frontend's per-chain registry (`config/networks.js`) reconfigures every address/token/pool/explorer from the connected wallet's chain, and the backend indexer is multi-chain (per-chain cursor, rows isolated by `hook_address`). | Proves portability: a second, fully self-contained deployment that never touches the Sepolia one, live and marking on Unichain. |
-| **Reactive Network** | The IL mark is computed by a **Reactive Smart Contract** on Lasna that subscribes to the hook's swap events and runs the two-phase relay `prepareILBondData → ILBondDataBundle → settleILMark` in the ReactVM — one RSC per destination chain. | The RSC is the *brain* of the product, not a side feature — the IL leg cannot be kept honest on every swap, trustlessly and off the hot path, without it. |
+The hackathon build computed marks in an external event-driven contract on a second network. It worked, but it carried three liveness assumptions: a callback service, a funded gas balance, and a cross-chain relay. v5 deletes all three. The insight is that a Uniswap v4 hook already *is* the event listener: `afterSwap` fires on exactly the events the external engine subscribed to. So the smoothing EWMA moved into the hook, the IL formula became a `public pure` function (`computeILMark`), and per-position marks became a lazy view (`ilMark`) computed from entry price vs the pool's smoothed mark. Strictly fewer trust assumptions, always-fresh marks, zero extra gas on the swap path, and the whole system is one auditable contract.
 
 ---
 
 ## 2. Architecture
 
-Three layers — **settlement** (Uniswap v4), **brains** (Reactive Network), **product** (backend + frontend) — wired into one event loop. The same contract pair is deployed independently on two destination chains; everything in the app resolves by the connected wallet's chain.
+Two layers: **settlement + brains** (one Uniswap v4 hook, deployed independently per chain) and **product** (indexer + frontend). Everything in the app resolves by the connected wallet's chain.
 
 ```mermaid
 flowchart TB
-    User["👤 User / Wallet<br/>LP · IL-T buyer · vol trader<br/>RainbowKit + wagmi"]
+    User["👤 User / Wallet<br/>LP hedging IL · IL-T underwriter<br/>RainbowKit + wagmi"]
 
-    subgraph SETTLE["⚙️ Settlement Layer — Uniswap v4 · Sepolia 11155111 + Unichain Sepolia 1301"]
+    subgraph CHAIN["⚙️ On-chain, Uniswap v4 · Sepolia 11155111 + Unichain Sepolia 1301"]
         direction LR
         PM["Uniswap v4 PoolManager<br/>singleton · holds liquidity<br/>45 pools Sepolia / 3 Unichain"]
-        Hook["ILBondHook.sol<br/>v4 hook + Reactive callback contract<br/>depositILBond → mint FEE-T + IL-T<br/>buyILBond → premium → FEE-T holder<br/>beforeSwap → dynamic fee EWMA<br/>afterSwap → emit SwapOccurred<br/>settleILMark ← RSC → ILMarkUpdated"]
+        Hook["ILBondHook.sol · the whole system<br/>depositILBond → mint FEE-T + IL-T<br/>buyILBond → premium → FEE-T holder<br/>collectFees / exit → fees → FEE-T<br/>beforeSwap → dynamic fee EWMA<br/>afterSwap → smoothed mark EWMA<br/>ilMark(id) → live IL, derived, pure"]
         PM <-->|"unlock / modifyLiquidity"| Hook
     end
 
-    subgraph REACT["🧠 Reactive Layer — Reactive Lasna 5318007 · ReactVM"]
-        RSC["ILBondReactive.sol — one RSC per destination chain<br/>subscribes: SwapOccurred · PositionCreated/Exited · Bundle<br/>computes IL = 1 − 2√r ÷ (1+r) per position<br/>fixed-point · overflow-guarded · tracks activeCount"]
-    end
-
-    subgraph PRODUCT["🖥️ Product Layer — Vercel + Supabase + React"]
+    subgraph PRODUCT["🖥️ Product Layer, Vercel + Supabase + React"]
         Indexer["api/index-events.js<br/>multi-chain log indexer<br/>cron + client nudge<br/>recovers poolId from ModifyLiquidity"]
         DB[("Supabase Postgres · RLS<br/>hook_events tagged by hook_address<br/>indexer_state per-chain cursor")]
         OG["api/og.js · position-page.js<br/>live OG share cards per chain"]
-        FE["React + Vite app<br/>config/networks.js · NetworkContext<br/>hooks/reads.js — Supabase-first<br/>pages · components · lib (IL math)"]
+        FE["React + Vite app<br/>config/networks.js · NetworkContext<br/>hooks/reads.js, Supabase-first<br/>pages · components · lib (IL math)"]
         Indexer -->|upsert| DB
         DB -->|read| FE
         OG --> FE
     end
 
-    User -->|"deposit / buy / swap / exit / withdraw"| Hook
-    Hook -.->|"events: SwapOccurred / PositionCreated / Exited / Bundle"| RSC
-    RSC -.->|"callbacks via Callback Proxy:<br/>prepareILBondData → settleILMark"| Hook
-    Hook -.->|"event logs"| Indexer
-    FE -.->|"wallet writes"| Hook
+    User -->|"deposit / buy / swap / collect / exit / withdraw"| Hook
+    Hook -.->|"event logs (SwapOccurred carries the mark)"| Indexer
+    FE -.->|"wallet writes + view reads (ilMark)"| Hook
 
     classDef settle fill:#1e293b,stroke:#38bdf8,color:#e2e8f0;
-    classDef react fill:#2a1e3b,stroke:#a78bfa,color:#e2e8f0;
     classDef product fill:#1e2b22,stroke:#34d399,color:#e2e8f0;
     class PM,Hook settle;
-    class RSC react;
     class Indexer,DB,OG,FE product;
 ```
 
-**The hot path stays cheap.** `afterSwap` does nothing but emit a price snapshot. All the expensive work — decoding every open position and running the IL formula — happens in the ReactVM, where it's nearly free and externally auditable. The mark moves exactly when reality moves, which is the only time it should.
+**The hot path stays cheap.** `afterSwap` updates two EWMAs (volatility for the dynamic fee, smoothed tick for the mark) and emits one event. The expensive part, the square-root IL formula, never runs on the swap path at all: it runs at *read* time, in a `view` call that costs traders nothing.
 
-**The frontend reads backend-first.** Public RPCs cap `eth_getLogs` to ~9,500 blocks (~hours of history). The Supabase indexer ingests the *full* hook-event history per chain, so price charts, IL marks, activity feeds, leaderboards and pool trends are complete and fast; on-chain log reads are only a fallback.
+**Marks rebuild from the event log alone.** `SwapOccurred` carries both the spot price and the smoothed marking price, so any indexer can reconstruct every position's full IL history trustlessly from swap events, no archival state reads, no privileged data source.
 
-### The reactive loop
+**The frontend reads backend-first.** Public RPCs cap `eth_getLogs` to ~9,500 blocks (hours of history). The Supabase indexer ingests the *full* hook-event history per chain, so price charts, IL marks, activity feeds, leaderboards and pool trends are complete and fast; on-chain log reads are only a fallback.
+
+### The marking loop
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor U as Trader
-    participant H as ILBondHook<br/>(destination chain)
-    participant R as ILBondReactive<br/>(Lasna · ReactVM)
+    participant H as ILBondHook
+    actor R as Any reader
 
     U->>H: swap on any pool
-    Note over H: afterSwap emits<br/>SwapOccurred(poolId, sqrtPrice, tick)
-    H-->>R: SwapOccurred event
-    R->>H: callback prepareILBondData()
-    Note over H: walk active set,<br/>read EACH position's own pool price
-    H-->>R: emit ILBondDataBundle<br/>(every open position)
-    Note over R: compute IL = 1 − 2√r ÷ (1+r)<br/>per position (overflow-guarded)
-    R->>H: callback settleILMark(id, ilBps, markValue)<br/>per position
-    Note over H: store mark →<br/>emit ILMarkUpdated
+    Note over H: afterSwap smooths the mark:<br/>markTick += (tick − markTick) / 4<br/>emits SwapOccurred(price, markPrice)
+    R->>H: ilMark(positionId)  [view]
+    Note over H: IL = 1 − 2√r ÷ (1+r)<br/>r = markPrice² / entryPrice²<br/>pure · exact · overflow-guarded
+    H-->>R: (ilBps, markValue) · live as of the last swap
 ```
 
-**Exit & settle (separate user action).** Any party (LP / FEE-T / IL-T holder) can `exitPosition`: liquidity is removed and the underlying is credited to the **IL-T holder** — they bear the position's composition, which *is* the impermanent loss — then each party `withdraw`s their own balance per token. No timer anywhere; the mark updates exactly when price does.
+**Exit and settle (separate user action).** A current leg holder calls `exitPosition`: liquidity is removed and the proceeds split exactly. Accrued swap fees are credited to the **FEE-T holder**; the underlying principal is credited to the **IL-T holder**, whose composition *is* the impermanent-loss outcome. Each party then `withdraw`s per token. The FEE-T holder can also harvest fees any time with `collectFees`, without closing anything. No timer anywhere; the mark updates exactly when price does.
 
 ---
 
@@ -125,15 +114,13 @@ sequenceDiagram
 
 ```
 src/
-  ILBondHook.sol          # v4 hook + Reactive callback contract (runs on Sepolia / Unichain)
-  ILBondReactive.sol      # the Reactive Smart Contract (runs on Lasna ReactVM)
+  ILBondHook.sol          # the entire protocol: one v4 hook, self-marking
   MockERC20.sol           # mintable test token (in-app faucet)
-test/                     # 74 Foundry tests — unit, fuzz, invariant
-  ILBondHook.t.sol        # lifecycle, access control, dynamic fee, multi-pool, fuzz   (27)
-  ILBondHookEdge.t.sol    # refunds, premium routing, exit auth, active-set, events    (14)
-  ILReactiveMath.t.sol    # IL math fuzzed over full sqrt-price range + react() path   (10)
-  ILReactiveLifecycle.t.sol # react() routing, callback-only access, activeCount       (11)
-  ILBondHookInvariant.t.sol # solvency / active-set / fee-bound invariants
+test/                     # 72 Foundry tests: unit, fuzz, invariant
+  ILBondHook.t.sol        # lifecycle, fee routing, smoothed mark, auto-quote, native pools
+  ILBondHookEdge.t.sol    # refunds, premium+fee routing to current holder, exit auth, events
+  ILMarkMath.t.sol        # IL math fuzzed over the full sqrt-price range
+  ILBondHookInvariant.t.sol # solvency / active-set / fee-bound / mark-bound invariants
 script/
   25_FreshDeploy.s.sol        # Sepolia: hook + 45 pools, seeded
   30_UnichainDeploy.s.sol     # Unichain: hook + 3 mock tokens + pools + 2 positions
@@ -155,17 +142,17 @@ ILBOND_REPORT.md          # full technical report
 ### Prerequisites
 
 - [Foundry](https://book.getfoundry.sh/) (`forge`, `cast`) · Node 18+ · npm
-- A funded testnet key for deploying/swapping (Sepolia ETH, Unichain Sepolia ETH, Lasna REACT)
+- A funded testnet key for deploying/swapping (Sepolia ETH, Unichain Sepolia ETH)
 
-### Contracts — build & test
+### Contracts: build & test
 
 ```bash
 forge install
 forge build
-forge test            # 74 passing: unit + fuzz + invariant
+forge test            # 72 passing: unit + fuzz + invariant
 ```
 
-### Frontend — run locally
+### Frontend: run locally
 
 ```bash
 cd frontend
@@ -173,26 +160,24 @@ npm install
 npm run dev           # Vite dev server; reads on-chain directly
 ```
 
-The app works against the **live** deployments out of the box. The Supabase indexer and OG cards run as Vercel functions — to exercise them locally use `vercel dev`, or just deploy. Environment variables (frontend reads `VITE_`-prefixed; the indexer reads server-only keys):
+The app works against the **live** deployments out of the box. The Supabase indexer and OG cards run as Vercel functions. To exercise them locally use `vercel dev`, or just deploy. Environment variables (frontend reads `VITE_`-prefixed; the indexer reads server-only keys):
 
 ```
 VITE_SUPABASE_URL=...              # public, read-only client
 VITE_SUPABASE_PUBLISHABLE_KEY=...
 SUPABASE_URL=...                   # server-side (indexer)
-SUPABASE_SERVICE_ROLE_KEY=...      # server-side ONLY — never shipped to the client
+SUPABASE_SERVICE_ROLE_KEY=...      # server-side ONLY, never shipped to the client
 VITE_SEPOLIA_RPC= / VITE_UNICHAIN_RPC= / VITE_LOG_RPC=   # optional RPC overrides
 ```
 
-Backend setup: run `frontend/supabase/schema.sql` once in the Supabase SQL editor (creates `hook_events` + `indexer_state` with RLS — public read, indexer writes with the service-role key). The indexer is multi-chain: each chain has its own entry in `api/index-events.js NETWORKS` and its own resume cursor, and rows isolate by `hook_address`.
+Backend setup: run `frontend/supabase/schema.sql` once in the Supabase SQL editor (creates `hook_events` + `indexer_state` with RLS: public read, indexer writes with the service-role key). The indexer is multi-chain: each chain has its own entry in `api/index-events.js NETWORKS` and its own resume cursor, and rows isolate by `hook_address`.
 
 ### Live deployments
 
 | | Ethereum Sepolia (11155111) | Unichain Sepolia (1301) |
 |---|---|---|
-| ILBondHook | `0x58A3A816864F1E5f6F38F01f9f5AE1Cacc9210C0` | `0x56B99A42E41D5987b2F39E97F3EBe5f3d76e10C0` |
-| ILBondReactive (Lasna) | `0x27eab090BF647e191A4FB121A780aA6ED89C53E2` | `0x4F193c807b4BD93054332bc67e64428725AA107D` |
+| ILBondHook | `0x57696AB5077Aa634c13682C3d3E84287935290c0` | `0x20487A756FececfF800d15EC76C78e0487A2D0c0` |
 | PoolManager | `0xE03A1074c86CFeDd5C142C4F04F1a1536e203543` | `0x00B036B58a818B1BC34d502D3fE730Db729e62AC` |
-| Callback proxy | `0xc9f36411C9897e7F959D99ffca2a0Ba7ee0D7bDA` | `0x9299472A6399Fd1027ebF067571Eb3e3D7837FC4` |
 | Pools | 45 pairs (10 tokens) | 3 pairs (mWETH/mWBTC/mUSDC) |
 
 ### Deploy your own
@@ -204,15 +189,27 @@ forge script script/25_FreshDeploy.s.sol --rpc-url <SEPOLIA_RPC> --private-key $
 # Unichain Sepolia (3 pools + 2 positions)
 forge script script/30_UnichainDeploy.s.sol --rpc-url https://sepolia.unichain.org \
   --private-key $KEY --broadcast --slow
-
-# Reactive contract on Lasna — point it at the hook + destination chain id
-forge create src/ILBondReactive.sol:ILBondReactive --rpc-url https://lasna-rpc.rnk.dev/ \
-  --private-key $KEY --broadcast --value 10ether \
-  --constructor-args <owner> <hook> <destChainId> <swapTopic> <createdTopic> <exitedTopic> <bundleTopic>
 ```
 
-**Funding is load-bearing.** The hook is an `AbstractPayer` and **must hold native gas on its own chain** to pay for reactive callbacks — an unfunded hook goes into debt after the first callback and the proxy silently stops delivering marks. Fund the hook (and `coverDebt` if needed), and fund the RSC with REACT on Lasna.
+That's the whole deployment. One contract per chain; the hook needs no funding, no registration, and no companion services.
 
 ---
 
-*Uniswap v4 for settlement. Reactive Network for the brains. Testnet only — not financial advice.*
+## 4. Beta status and roadmap
+
+Everything the pitch promises is now real in the contracts: the split, the premium, the per-swap mark, fee routing to the yield leg, and on-chain premium quoting. What we are explicit about for beta users:
+
+- **Testnet only.** Mock tokens, test ETH. Do not bring real money yet.
+- **The live mark is a price, not a settlement engine.** Exit settles from the real underlying (which is the honest ground truth); the per-swap mark is the live quote you trade the legs against. Making the mark itself move collateral between the legs is the next protocol version.
+- **The premium quote is a first-order model.** `quotePremium` prices the hedge from realized volatility, range width and notional, clamped to sane bounds. It is deliberately conservative; a full term-structure model comes later.
+
+Next up:
+
+- **Streaming premiums.** Today the premium is a lump sum at purchase. A funding-style stream from the IL-T underwriter to the FEE-T holder (or the reverse, depending on the mark) turns the hedge into a continuously re-priced position and pairs naturally with the `collectFees` plumbing that already exists.
+- **Binding mark-to-market.** Let the hook's derived mark move margin between the two legs before exit, so the hedge pays out continuously instead of at close.
+- **Tranched risk.** A senior IL-T that eats the first 5% of IL and a junior that eats the rest: two risk-adjusted premiums from one position.
+- **Cross-pool netting.** The hook already marks every pool it runs; one IL-T could hedge a book's *net* exposure across correlated pools.
+
+---
+
+*Uniswap v4 for settlement. The hook for the brains. Testnet only. Not financial advice.*

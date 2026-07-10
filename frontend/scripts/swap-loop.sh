@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Spaced random swaps across all pairs, from A1 and A2, with >=30s between each
-# on-chain swap so the Reactive Network has time to react (no callback bundling).
+# on-chain swap so charts get distinct data points (marks derive in-hook per swap).
 set -u
 SEP=https://ethereum-sepolia-rpc.publicnode.com
 ROUTER=0xf13D190e9117920c703d79B5F33732e10049b115
-HOOK=0x58A3A816864F1E5f6F38F01f9f5AE1Cacc9210C0
+HOOK=0x57696AB5077Aa634c13682C3d3E84287935290c0
 FEE=8388608   # DYNAMIC_FEE_FLAG
 SPACING=60
 MAXU=$(cast max-uint)
@@ -24,7 +24,7 @@ SKIP_SETUP=${3:-no}   # pass "noset" on chunked re-runs (approvals/mints already
 addrs=(0x748b5c9623528d346c414f4f236b3b5b5c7683cb 0x912a7fb66391eae95ddee40b664ff497108580cd 0x160fc2d6a542565ba7c2a57e18d6b28f62c8d0c7 0xcbaca08f7eb9eb07537f344ebec7e79302f60823 0x25c4cb25e8bf582577f21bffa17a88b8074ff8ba 0x00a311cd8be35953635b0bc619bdc807782dfc5e 0xff34b3d4aee8ddcd6f9afffb6fe49bd371b8a357 0x6d906e526a4e2ca02097ba9d0caa3c382f52278e 0x94a9d9ac8a22534e3faca9f4e7f2e2cf85d5e4c8 0xaa8e23fb1079ea71e0a56f48a2aa51851d8433d0)
 decs=(18 8 18 18 18 18 18 2 6 6)
 custom=(1 1 1 1 1 1 0 0 0 0)
-# position/demo pools (custom pairs) — bias half the swaps here for IL graphs
+# position/demo pools (custom pairs) - bias half the swaps here for IL graphs
 pospairs=("0 1" "2 3" "4 5")
 
 if [ "$SKIP_SETUP" != "noset" ]; then

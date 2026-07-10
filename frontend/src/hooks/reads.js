@@ -1,17 +1,11 @@
 import { useMemo } from 'react'
-import { useReadContract, useReadContracts, useBalance } from 'wagmi'
+import { useReadContracts } from 'wagmi'
 import { useQuery } from '@tanstack/react-query'
 import { createPublicClient, http, parseEventLogs, parseAbiItem } from 'viem'
-import {
-  HOOK_ABI,
-  ERC20_ABI,
-  REACTIVE_ABI,
-  STATEVIEW_ABI,
-  LASNA_CHAIN_ID,
-} from '../config/contracts'
+import { HOOK_ABI, ERC20_ABI, STATEVIEW_ABI } from '../config/contracts'
 import { useNetwork } from '../context/NetworkContext'
 import { fetchEventsFromSupabase, supabaseEnabled, nudgeIndexer } from '../lib/supabase'
-import { computeIL, bundleMark } from '../lib/il'
+import { computeIL } from '../lib/il'
 
 export const REFRESH = 12000
 const LOG_LOOKBACK = 9500n
@@ -38,7 +32,6 @@ export function useHookCounters() {
     contracts: [
       { ...hookBase, functionName: 'nextPositionId' },
       { ...hookBase, functionName: 'activePositionCount' },
-      { ...hookBase, functionName: 'bundleCounter' },
     ],
     query: { refetchInterval: REFRESH },
   })
@@ -46,10 +39,19 @@ export function useHookCounters() {
   return {
     nextId: d[0]?.result,
     activeCount: d[1]?.result,
-    bundles: d[2]?.result,
     isLoading: r.isLoading,
     refetch: r.refetch,
   }
+}
+
+// SwapOccurred count = how many times the mark has moved (every swap re-marks).
+export function useMarkCount() {
+  const r = useAllEvents()
+  const count = useMemo(
+    () => (r.data ? r.data.filter((e) => e.name === 'SwapOccurred').length : undefined),
+    [r.data],
+  )
+  return { count, isLoading: r.isLoading }
 }
 
 // ── position → poolId map (backend-first; on-chain ModifyLiquidity fallback) ──
@@ -58,10 +60,8 @@ const MODIFY_LIQ_EVENT = parseAbiItem(
 )
 export function usePositionPoolMap() {
   const net = useNetwork()
-  // Backend-first: the indexer folds each position's poolId into its
-  // PositionCreated event args, so we read it straight from Supabase via
-  // useAllEvents. Only fall back to an on-chain PoolManager.ModifyLiquidity scan
-  // when the backend yields nothing (e.g. Unichain, which has no indexer).
+  // Indexer folds poolId into PositionCreated args; fall back to an on-chain
+  // ModifyLiquidity scan only when the backend yields nothing (e.g. Unichain).
   const ev = useAllEvents()
   const fromEvents = useMemo(() => {
     const m = {}
@@ -307,19 +307,15 @@ async function fetchEventsOnChain(net, fromBlock) {
   }))
 }
 
-// Merge two event lists, de-duping by `key` (txHash-logIndex). Same log from
-// either source is identical, so last-writer-wins is fine.
+// Merge two event lists, de-duping by txHash-logIndex.
 function mergeEvents(...lists) {
   const seen = new Map()
   for (const list of lists) for (const e of list) seen.set(e.key, e)
   return [...seen.values()]
 }
 
-// ── all hook events — Supabase history + live on-chain tail, merged ──────────
-// Supabase holds the full backlog (no 9500-block cap) but lags head (the indexer
-// only catches up on nudge/cron). So we ALWAYS also read the recent on-chain tail
-// — just the blocks past Supabase's high-water mark — and merge, so freshly
-// emitted events appear immediately regardless of indexer lag.
+// All hook events: Supabase holds the full backlog but lags head, so always
+// merge in the on-chain tail past its high-water mark.
 export function useAllEvents() {
   const net = useNetwork()
   return useQuery({
@@ -401,87 +397,32 @@ export function usePositionHistory(positionId, poolId) {
     const created = events.find((e) => e.name === 'PositionCreated') || null
     const sold = events.find((e) => e.name === 'ILBondSold') || null
 
-    const derived = r.data
-      .filter((e) => e.name === 'ILBondDataBundle')
-      .sort((a, b) => Number(a.blockNumber - b.blockNumber))
-      .map((e) => {
-        const mark = bundleMark(e.args?.data, want)
-        if (!mark) return null
-        return {
-          ts: e.ts,
-          blockNumber: e.blockNumber,
-          logIndex: e.logIndex,
-          name: 'ILMarkUpdated',
-          derived: true,
-          args: { positionId: BigInt(want), ilBps: BigInt(mark.ilBps), markValue: mark.markValue },
-        }
-      })
-      .filter(Boolean)
-
-    const onChainMarks = events.filter((e) => e.name === 'ILMarkUpdated')
-    const ilMarks = derived.length ? derived : onChainMarks
+    // SwapOccurred carries the smoothed marking price, so IL history rebuilds
+    // from the event log alone (old logs without the field fall back to spot).
+    const entrySqrt = created?.args?.entrySqrtPriceX96
+    const ilMarks = entrySqrt
+      ? swaps
+          .filter((e) => e.blockNumber >= created.blockNumber)
+          .map((e) => {
+            const markSqrt = e.args?.markSqrtPriceX96 || e.args?.sqrtPriceX96
+            if (!markSqrt) return null
+            return {
+              ts: e.ts,
+              blockNumber: e.blockNumber,
+              logIndex: e.logIndex,
+              name: 'ILMark',
+              derived: true,
+              args: {
+                positionId: BigInt(want),
+                ilBps: BigInt(Math.round(computeIL(entrySqrt, markSqrt) * 10000)),
+              },
+            }
+          })
+          .filter(Boolean)
+      : []
 
     return { events, ilMarks, swaps, created, sold, isLoading: r.isLoading }
   }, [r.data, positionId, poolId, r.isLoading])
-}
-
-// ── leaderboard aggregations from event log + on-chain position state ──────
-export function useLeaderboardData() {
-  const r = useAllEvents()
-  const { positions } = usePositions()
-  return useMemo(() => {
-    const events = r.data || []
-    const sold = events.filter((e) => e.name === 'ILBondSold')
-    const created = events.filter((e) => e.name === 'PositionCreated')
-
-    const byId = new Map(positions.map((p) => [Number(p.id), p]))
-
-    const lpEarn = new Map()
-    for (const e of sold) {
-      const p = byId.get(Number(e.args.positionId))
-      if (!p) continue
-      const lp = (p.lp || '').toLowerCase()
-      lpEarn.set(lp, (lpEarn.get(lp) || 0n) + (e.args.premium || 0n))
-    }
-
-    const hunterSpend = new Map()
-    for (const e of sold) {
-      const b = (e.args.buyer || '').toLowerCase()
-      hunterSpend.set(b, (hunterSpend.get(b) || 0n) + (e.args.premium || 0n))
-    }
-
-    const lpCount = new Map()
-    for (const e of created) {
-      const o = (e.args.owner || '').toLowerCase()
-      lpCount.set(o, (lpCount.get(o) || 0) + 1)
-    }
-
-    const ilHeld = new Map()
-    for (const p of positions) {
-      if (!p.active || !p.ilBondSold) continue
-      const h = (p.ilHolder || '').toLowerCase()
-      ilHeld.set(h, (ilHeld.get(h) || 0) + 1)
-    }
-
-    const toList = (m) =>
-      [...m.entries()]
-        .map(([address, value]) => ({ address, value }))
-        .sort((a, b) => (a.value > b.value ? -1 : a.value < b.value ? 1 : 0))
-        .slice(0, 10)
-
-    return {
-      lpEarnings: toList(lpEarn),
-      hunterSpend: toList(hunterSpend),
-      lpCount: toList(lpCount),
-      ilHolders: toList(ilHeld),
-      totals: {
-        positionsMinted: created.length,
-        bondsSold: sold.length,
-        totalPremium: sold.reduce((s, e) => s + (e.args.premium || 0n), 0n),
-      },
-      isLoading: r.isLoading,
-    }
-  }, [r.data, positions, r.isLoading])
 }
 
 // ── per-account balances + hook allowances for a token pair ──────────────────
@@ -526,24 +467,4 @@ export function useClaimable(address) {
     return out
   }, [r.data, tokenList])
   return { claims, isLoading: r.isLoading, refetch: r.refetch }
-}
-
-// ── Reactive contract status on Lasna ───────────────────────────────────────
-export function useReactiveStatus() {
-  const net = useNetwork()
-  const active = useReadContract({
-    address: net.addr.reactive,
-    abi: REACTIVE_ABI,
-    functionName: 'activeCount',
-    chainId: LASNA_CHAIN_ID,
-    query: { refetchInterval: 20000, retry: 1 },
-  })
-  const bal = useBalance({ address: net.addr.reactive, chainId: LASNA_CHAIN_ID, query: { refetchInterval: 20000, retry: 1 } })
-  return {
-    activeCount: active.data,
-    balance: bal.data?.value,
-    symbol: bal.data?.symbol || 'REACT',
-    online: !active.isError && active.data !== undefined,
-    isLoading: active.isLoading,
-  }
 }

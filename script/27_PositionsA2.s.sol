@@ -24,7 +24,7 @@ contract PositionsA2 is Script {
     uint24 constant DYN = LPFeeLibrary.DYNAMIC_FEE_FLAG;
     int24 constant SPACING = 60;
     IPoolManager constant PM = IPoolManager(0xE03A1074c86CFeDd5C142C4F04F1a1536e203543);
-    ILBondHook constant HOOK = ILBondHook(payable(0x58A3A816864F1E5f6F38F01f9f5AE1Cacc9210C0));
+    ILBondHook constant HOOK = ILBondHook(payable(0x57696AB5077Aa634c13682C3d3E84287935290c0));
 
     address constant WBTC = 0x912A7Fb66391eAe95DDee40B664FF497108580CD;
     address constant LINK = 0x160fC2D6a542565ba7C2a57E18d6b28F62C8D0C7;
@@ -42,7 +42,7 @@ contract PositionsA2 is Script {
         tl = TickMath.minUsableTick(SPACING);
         tu = TickMath.maxUsableTick(SPACING);
 
-        // 1) buy the demo IL-T (posId 0) — premium is in WBTC (demo currency1)
+        // 1) buy the demo IL-T (posId 0) - premium is in WBTC (demo currency1)
         IMintable(WBTC).mint(me, 10 * 1e8);
         IERC20(WBTC).approve(address(HOOK), type(uint256).max);
         HOOK.buyILBond(0);

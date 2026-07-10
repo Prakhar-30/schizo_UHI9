@@ -69,7 +69,7 @@ export default function Faucet({ showSelector = false, banner = false }) {
 
       {banner && (
         <div className="mt-3 rounded-lg border border-amber/30 bg-amber/[0.06] px-3 py-2 font-mono text-[11px] leading-relaxed text-amber/90">
-          ⚠ Test / demo / beta only — mints free test tokens for the <b>{pool.label}</b> pool on {net.name}. These are not
+          ⚠ Test / demo / beta only: mints free test tokens for the <b>{pool.label}</b> pool on {net.name}. These are not
           real assets and have no value.
         </div>
       )}

@@ -22,7 +22,7 @@ export default function PoolTrend({ prices, current, muted = false, loading = fa
         className="flex items-center justify-center font-mono text-[9px] uppercase tracking-wider text-bone/25"
         style={{ width, height }}
       >
-        —
+        –
       </div>
     )
   }
@@ -44,7 +44,6 @@ export default function PoolTrend({ prices, current, muted = false, loading = fa
     <svg width={width} height={height} className="block">
       {hasTrend && <path d={area} fill={color} opacity="0.12" />}
       <path d={d} stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      {/* live head — bobs + blinks so the row reads as live (auto-refreshes ~12s) */}
       <circle cx={hx} cy={hy} r="3.5" fill={color} opacity="0.25">
         <animate attributeName="r" values="3;7;3" dur="1.5s" repeatCount="indefinite" />
         <animate attributeName="opacity" values="0.35;0;0.35" dur="1.5s" repeatCount="indefinite" />

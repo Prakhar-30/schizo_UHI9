@@ -3,7 +3,7 @@
 // so we can set a safe amount0Max / amount1Max.
 
 const Q96 = 2n ** 96n
-// Full-range bounds — using TickMath MIN/MAX sqrt prices slightly overestimates
+// Full-range bounds - using TickMath MIN/MAX sqrt prices slightly overestimates
 // the real [-887220, 887220] requirement, which keeps our Max amounts safe.
 export const MIN_SQRT = 4295128739n
 export const MAX_SQRT = 1461446703485210103287273052203988822378723970342n
@@ -36,11 +36,8 @@ export function withBuffer(x, bps = 200n) {
   return (x * (10000n + bps)) / 10000n + 1n
 }
 
-// ── inverse: token amount → liquidity (Uniswap LiquidityAmounts) ─────────────
-// Used by the Create page so the user enters a real, decimal-correct token
-// amount and we derive the abstract liquidity (L) the hook needs — instead of
-// asking for raw L (which produces absurd token requirements on non-18-dec
-// pools, e.g. ~1M WBTC for "10 liquidity").
+// Inverse: token amount → liquidity, so Create can accept real decimal-correct
+// token amounts instead of raw L (absurd on non-18-dec pools).
 
 function liquidityForAmount0(sqrtA, sqrtB, amount0) {
   if (sqrtA > sqrtB) [sqrtA, sqrtB] = [sqrtB, sqrtA]

@@ -127,7 +127,7 @@ contract ILBondHookInvariant is BaseTest {
             uint160(Hooks.AFTER_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG)
                 ^ (0x6666 << 144)
         );
-        deployCodeTo("ILBondHook.sol:ILBondHook", abi.encode(poolManager, address(this)), flags);
+        deployCodeTo("ILBondHook.sol:ILBondHook", abi.encode(poolManager), flags);
         hook = ILBondHook(payable(flags));
 
         (Currency c0, Currency c1) = deployCurrencyPair();
@@ -207,6 +207,20 @@ contract ILBondHookInvariant is BaseTest {
         uint24 f = hook.currentFee(id);
         assertGe(f, hook.BASE_FEE());
         assertLe(f, hook.MAX_FEE());
+    }
+
+    /// Every active position's derived mark is a bounded loss: 0 >= il >= -100%,
+    /// and the mark value never exceeds the position's liquidity.
+    function invariant_derivedMarkAlwaysBounded() public view {
+        uint256 cnt = hook.activePositionCount();
+        for (uint256 i; i < cnt; ++i) {
+            uint256 pid = hook.activePositionIds(i);
+            (int256 ilBps, uint256 markValue) = hook.ilMark(pid);
+            assertLe(ilBps, int256(0), "mark is never a gain");
+            assertGe(ilBps, -int256(10000), "mark never exceeds -100%");
+            (,,,,, uint128 liq,,,,) = hook.getPosition(pid);
+            assertLe(markValue, uint256(liq), "mark value <= liquidity");
+        }
     }
 
     /// The hook always holds enough of each token to cover all outstanding claims.

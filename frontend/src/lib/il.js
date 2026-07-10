@@ -1,8 +1,6 @@
 // Math helpers for prices + impermanent loss.
 // All sqrtPrice values are Uniswap Q64.96 fixed-point (uint160).
 
-import { decodeAbiParameters } from 'viem'
-
 const Q96 = 2 ** 96
 
 /** sqrtPriceX96 → RAW price (token1 per token0, in smallest units). Decimal-agnostic. */
@@ -48,64 +46,4 @@ export function ilSeverity(bps) {
   const mag = Math.abs(Number(bps || 0)) / 100 // percent
   // 0% → 0, ~15%+ → 1
   return Math.min(1, mag / 15)
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  ILBondDataBundle decoding — derive IL marks from the bundle the RSC emits.
-//
-//  The RSC's mark-settlement leg (settleILMark → ILMarkUpdated) can lag or stall
-//  while the hook keeps emitting ILBondDataBundle every swap cycle. The bundle
-//  carries everything needed to reproduce the mark (current price + each open
-//  position's entry/range/liquidity), so we compute the same value the RSC would
-//  have posted — mirroring ILBondReactive._computeILMark exactly.
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Mirrors ILBondHook.PositionData, wrapped as `abi.encode(PositionData[])`.
-// Each entry now carries its own pool's current price, so marks are multi-pool safe.
-const BUNDLE_ABI = [
-  {
-    type: 'tuple[]',
-    components: [
-      { name: 'positionId', type: 'uint256' },
-      { name: 'entrySqrtPriceX96', type: 'uint160' },
-      { name: 'currentSqrtPriceX96', type: 'uint160' },
-      { name: 'sqrtPriceLower', type: 'uint160' },
-      { name: 'sqrtPriceUpper', type: 'uint160' },
-      { name: 'liquidity', type: 'uint128' },
-    ],
-  },
-]
-
-/**
- * Decode an ILBondDataBundle event's `data` bytes.
- * Returns `{ positions }` or null if it can't be decoded.
- */
-export function decodeBundle(dataHex) {
-  if (!dataHex) return null
-  try {
-    const [positions] = decodeAbiParameters(BUNDLE_ABI, dataHex)
-    return { positions }
-  } catch {
-    return null
-  }
-}
-
-/**
- * Compute the IL mark for one position from a bundle, matching the on-chain RSC:
- *   ilBps     = -round((1 - 2√r/(1+r)) * 10000),  r = currentP / entryP
- *   markValue = liquidity * (BPS - |ilBps|) / BPS   (token1-equivalent estimate)
- * Uses the position's own pool price carried in the bundle entry.
- * Returns `{ ilBps, markValue }` (BigInt markValue) or null if the position isn't
- * in the bundle / has no liquidity.
- */
-export function bundleMark(dataHex, positionId) {
-  const b = decodeBundle(dataHex)
-  if (!b) return null
-  const p = b.positions.find((x) => Number(x.positionId) === Number(positionId))
-  if (!p || !p.liquidity || !p.entrySqrtPriceX96 || !p.currentSqrtPriceX96) return null
-  const ilFraction = -computeIL(p.entrySqrtPriceX96, p.currentSqrtPriceX96) // non-negative magnitude
-  const ilMag = Math.max(0, Math.round(ilFraction * 10000))
-  const ilBps = -ilMag
-  const markValue = (p.liquidity * BigInt(10000 - ilMag)) / 10000n
-  return { ilBps, markValue }
 }

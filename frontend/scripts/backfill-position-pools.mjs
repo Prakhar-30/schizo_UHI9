@@ -3,7 +3,7 @@
 //
 //  The hook's PositionCreated event doesn't carry a poolId, so the frontend used
 //  to recover it via an RPC scan of PoolManager.ModifyLiquidity (salt = positionId,
-//  id = poolId, sender = hook) — which is RPC, not backend-first, and capped by the
+//  id = poolId, sender = hook) - which is RPC, not backend-first, and capped by the
 //  log window. This script resolves each position's pool ONCE and writes it into the
 //  existing `hook_events` rows' jsonb `args.poolId`, so the app can read it straight
 //  from Supabase (backend-first) like every other event field.
@@ -20,7 +20,7 @@ import { sepolia } from 'viem/chains'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-// minimal .env loader (no VITE_ stripping — we read both prefixes)
+// minimal .env loader (no VITE_ stripping - we read both prefixes)
 function loadEnv() {
   const p = path.join(__dirname, '..', '.env')
   const out = {}
@@ -40,9 +40,9 @@ const SUPABASE_URL = env.SUPABASE_URL || env.VITE_SUPABASE_URL
 const SERVICE_KEY = env.SUPABASE_SERVICE_ROLE_KEY
 const RPC = env.LOG_RPC || env.VITE_LOG_RPC || 'https://ethereum-sepolia-rpc.publicnode.com'
 
-const HOOK = '0x58A3A816864F1E5f6F38F01f9f5AE1Cacc9210C0'
+const HOOK = '0x57696AB5077Aa634c13682C3d3E84287935290c0'
 const POOL_MANAGER = '0xE03A1074c86CFeDd5C142C4F04F1a1536e203543'
-const DEPLOY_BLOCK = 11008000n
+const DEPLOY_BLOCK = 11239703n
 const MAX_RANGE = 9500n
 
 const MODIFY_LIQ = parseAbiItem(

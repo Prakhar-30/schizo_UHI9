@@ -1,7 +1,7 @@
 import { createPublicClient, http, parseAbiItem } from 'viem'
 
 const client = createPublicClient({ transport: http('https://ethereum-sepolia-rpc.publicnode.com') })
-const HOOK = '0x9D19eA2aad6c8748d566f28fe375fb8BCAA350c0'
+const HOOK = '0x57696AB5077Aa634c13682C3d3E84287935290c0'
 const ev = parseAbiItem('event SwapOccurred(bytes32 indexed poolId, uint160 sqrtPriceX96, int24 tick, uint128 liquidity)')
 
 const labels = {

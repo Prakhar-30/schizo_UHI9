@@ -12,8 +12,8 @@ import {LPFeeLibrary} from "@uniswap/v4-core/src/libraries/LPFeeLibrary.sol";
 import {BaseScript} from "./base/BaseScript.sol";
 
 /// @notice 6 mixed-direction swaps across the 3 Unichain Sepolia pools, sized to
-///         move price (and thus IL) without draining the seeded liquidity. Run
-///         AFTER the Reactive contract is live so each swap drives the mark loop.
+///         move price (and thus IL) without draining the seeded liquidity. Each
+///         swap nudges the hook's smoothed mark, so charts get real history.
 ///
 ///   forge script script/31_UnichainSwaps.s.sol --rpc-url https://sepolia.unichain.org \
 ///       --private-key $KEY --broadcast --slow
@@ -21,10 +21,10 @@ contract UnichainSwaps is BaseScript {
     uint24 constant DYN = LPFeeLibrary.DYNAMIC_FEE_FLAG;
     int24 constant SPACING = 60;
 
-    address constant HOOK = 0x56B99A42E41D5987b2F39E97F3EBe5f3d76e10C0;
-    address constant MWETH = 0x20D8D70AF616471Ff6e651f89Ff2cA1cA3fb5010; // 18
-    address constant MWBTC = 0x93336712394A7bE6DC61CFCF38d0431185B5c3A2; // 8
-    address constant MUSDC = 0x173e3Ab5Db82a0A67ee2B4a640E8848440aD149f; // 6
+    address constant HOOK = 0x20487A756FececfF800d15EC76C78e0487A2D0c0;
+    address constant MWETH = 0xC72377c60F46b7Bf812A55728d3b4c57b7Be692e; // 18
+    address constant MWBTC = 0x18CF733BD208ff54d4855bcA459F5099f38d4f2C; // 8
+    address constant MUSDC = 0xdC37BdfDf525769f96d46728aC8caC82823b69D3; // 6
 
     function run() public {
         vm.startBroadcast();

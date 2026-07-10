@@ -6,19 +6,21 @@ import SplitDiagram from '../components/SplitDiagram'
 
 const STEPS = [
   { t: 'Connect & switch to Sepolia', d: 'Connect any EVM wallet. The app runs on Ethereum Sepolia; transactions prompt a network switch if needed.', tag: 'setup' },
-  { t: 'Mint test tokens', d: "On the Markets page, hit the faucet to mint the test tokens for any pool. Free, testnet only — these aren't real assets.", tag: 'faucet' },
+  { t: 'Mint test tokens', d: "On the Markets page, hit the faucet to mint the test tokens for any pool. Free, testnet only. These aren't real assets.", tag: 'faucet' },
   { t: 'Mint a bond', d: 'Choose a liquidity size and an ask premium, then approve & deposit. You mint one position and hold both legs: FEE-T and IL-T.', tag: 'create' },
-  { t: 'Sell the risk', d: 'List sits on Markets automatically. A buyer pays your premium and takes IL-T. You keep FEE-T — yield with no price risk.', tag: 'trade' },
-  { t: 'Move the price', d: 'Use the swap panel on Markets. Each swap makes the hook emit a price snapshot the Reactive Network listens for.', tag: 'swap' },
-  { t: 'Watch the mark', d: 'Within a block or two the RSC posts each position\'s IL back on-chain. The gauge on every card updates live.', tag: 'reactive' },
+  { t: 'Hedge the risk', d: 'Your listing sits on Markets automatically. An underwriter pays your premium and takes IL-T. You keep FEE-T: yield with no price risk. You are hedged.', tag: 'trade' },
+  { t: 'Move the price', d: 'Use the swap panel on Markets. Each swap nudges the smoothed marking price the hook keeps for that pool.', tag: 'swap' },
+  { t: 'Watch the mark', d: 'Every position\'s IL derives live from its pool\'s mark, no waiting on anyone. The gauge on every card updates as you trade.', tag: 'mark' },
   { t: 'Exit & withdraw', d: 'Any party to a position can exit it. The IL-T holder receives the underlying composition; claim it from your Dashboard.', tag: 'settle' },
 ]
 
 const FAQ = [
-  { q: 'What actually is FEE-T and IL-T?', a: 'They are two owner slots on a single position inside the hook. FEE-T owns the yield + premium; IL-T owns the underlying LP composition and therefore bears impermanent loss. Each is transferable, mirroring a fungible-token API without leaving the contract.' },
-  { q: 'How is IL computed?', a: 'With the standard formula IL = 1 − 2√r/(1+r), where r is the current price over the entry price. It is computed inside the ReactVM on Reactive Network — not on the swap path — and posted back in basis points.' },
-  { q: 'Why Reactive Network and not a keeper?', a: 'A keeper polls on a timer and pays gas whether or not anything changed. IL only changes when price changes, and price only changes on swaps. The RSC reacts to swap events exactly — no cron, no idle polling, no trust in an off-chain bot.' },
-  { q: 'Is this real money?', a: 'No. Everything here is on Ethereum Sepolia and Reactive Lasna testnets with mintable mock tokens. It is a demonstration of the primitive, not a production market.' },
+  { q: 'What actually is FEE-T and IL-T?', a: 'They are two owner slots on a single position inside the hook. FEE-T owns the yield + premium; IL-T owns the underlying LP composition and therefore absorbs the impermanent loss. Each is transferable, mirroring a fungible-token API without leaving the contract.' },
+  { q: 'Who buys IL-T? Isn\'t that just gambling?', a: 'No more than insurance is. The IL-T buyer is an underwriter: they get paid a volatility-linked premium to warehouse a risk the LP needed gone. Desks with long-vol books buy it because the short-gamma payoff offsets what their options bleed; range-bound funds buy it for the premium. It is the oldest trade in finance, on-chain.' },
+  { q: 'How is IL computed?', a: 'With the standard formula IL = 1 − 2√r/(1+r), where r is the marking price over the entry price. The hook computes it in a public pure function whenever a mark is read, so it is exact, always current, and verifiable by anyone with one call.' },
+  { q: 'Can the mark be manipulated?', a: 'Not by any single transaction. The marking price is an EWMA-smoothed tick: one swap only moves it a fraction of the way toward its own price, so a same-tx flash move cannot set it. And since IL is derived at read time rather than stored, there is no stale stored value to poison. Skewing the mark means holding a distorted price across many swaps while arbitrage eats you.' },
+  { q: 'Why no keeper, oracle, or off-chain marker?', a: 'Because nothing needs to run. The hook already sees every swap, so it maintains the smoothed marking price right there, two storage writes on the swap path. IL derives from that mark on demand. No cron, no callback to fund, no bot to trust, no liveness assumption at all.' },
+  { q: 'Is this real money?', a: 'No. Everything here is on Ethereum Sepolia and Unichain Sepolia testnets with mintable mock tokens. It is a working beta of the primitive, not a production market.' },
 ]
 
 function Step({ i, t, d, tag }) {
@@ -45,14 +47,12 @@ export default function About() {
   const nw = useNetwork()
   const CONTRACTS = [
     { label: 'ILBondHook', net: nw.short, addr: nw.addr.hook, href: nw.addrUrl(nw.addr.hook) },
-    { label: 'ILBondReactive', net: 'Lasna', addr: nw.addr.reactive, href: nw.reactscanUrl(nw.addr.reactive) },
     { label: `${nw.getToken(nw.demoPool.token0).symbol} (demo token0)`, net: nw.short, addr: nw.demoPool.token0, href: nw.addrUrl(nw.demoPool.token0) },
     { label: `${nw.getToken(nw.demoPool.token1).symbol} (demo token1)`, net: nw.short, addr: nw.demoPool.token1, href: nw.addrUrl(nw.demoPool.token1) },
     { label: 'PoolManager', net: nw.short, addr: nw.addr.poolManager, href: nw.addrUrl(nw.addr.poolManager) },
   ]
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
-      {/* intro */}
       <div className="max-w-3xl">
         <Chip color="volt">
           <Dot color="volt" pulse /> UHI9 · Theme: Impermanent Loss
@@ -61,43 +61,41 @@ export default function About() {
           LP yield, without impermanent loss.
         </h1>
         <p className="mt-6 text-lg leading-relaxed text-bone/60">
-          Every IL hook before this one tried to <i>reduce</i> impermanent loss. schizō does something different — it{' '}
-          <b className="text-bone">sells it</b>. One LP position becomes two claims: a yield leg you keep, and a risk leg
-          a buyer takes off your hands for a premium.
+          Every IL hook before this one tried to <i>reduce</i> impermanent loss. schizō does something different: it lets
+          you <b className="text-bone">hedge it</b>. One LP position becomes two claims: a yield leg you keep, and a risk
+          leg an underwriter takes off your hands for a premium.
         </p>
       </div>
 
-      {/* problem */}
       <div className="mt-14 grid gap-5 md:grid-cols-2">
         <Card className="p-6">
           <Kicker>The problem</Kicker>
           <p className="mt-3 leading-relaxed text-bone/70">
-            An LP position is always a bundle: <span className="text-yield">fee income</span> (steady, vol-positive) glued
-            to <span className="text-risk">impermanent loss</span> (vol-negative). You can't own one without the other. A
-            treasury that wants yield is forced to take price risk; a trader who wants vol exposure is forced to market-make.
+            An LP position is always a bundle: <span className="text-yield">fee income</span> (steady, volume-driven) glued
+            to <span className="text-risk">impermanent loss</span> (price-driven). You can't own one without the other. A
+            treasury that wants yield is forced to hold price risk; a desk that would underwrite that risk for a premium
+            is forced to market-make.
           </p>
         </Card>
         <Card className="p-6">
           <Kicker>The fix</Kicker>
           <p className="mt-3 leading-relaxed text-bone/70">
             Unbundle them. <Leg kind="fee" className="mx-0.5" /> takes the fees and an upfront premium with zero price
-            risk. <Leg kind="il" className="mx-0.5" /> takes the impermanent loss in exchange for that premium. Two
-            audiences, two instruments, one position.
+            risk: that's the hedged LP. <Leg kind="il" className="mx-0.5" /> absorbs the impermanent loss in exchange for
+            that premium: that's the underwriter. Two audiences, two instruments, one position.
           </p>
         </Card>
       </div>
 
-      {/* split */}
       <div className="mt-16">
         <Kicker>The split</Kicker>
         <h2 className="mb-8 mt-2 font-black text-2xl tracking-tight sm:text-3xl">Anatomy of a bond</h2>
         <SplitDiagram />
       </div>
 
-      {/* architecture */}
       <div className="mt-16">
         <Kicker>Architecture</Kicker>
-        <h2 className="mt-2 font-black text-2xl tracking-tight sm:text-3xl">Two contracts, two chains</h2>
+        <h2 className="mt-2 font-black text-2xl tracking-tight sm:text-3xl">One contract, zero dependencies</h2>
         <Card className="mt-6 overflow-hidden p-0">
           <div className="grid md:grid-cols-2">
             <div className="border-b-2 border-white/10 p-7 md:border-b-0 md:border-r-2">
@@ -106,18 +104,19 @@ export default function About() {
                 <h3 className="font-bold">ILBondHook · {nw.short}</h3>
               </div>
               <p className="mt-3 text-sm leading-relaxed text-bone/55">
-                The v4 hook + callback contract. Holds positions, mints the two legs, takes the premium on a sale, and
-                emits a price snapshot after every swap. Receives the IL mark back from the RSC and stores it on-chain.
+                The whole system is one v4 hook. It holds positions, mints the two legs, takes the premium on a sale,
+                routes swap fees to FEE-T, and keeps an EWMA-smoothed marking price per pool that it updates on every
+                swap.
               </p>
             </div>
             <div className="p-7">
               <div className="flex items-center gap-2">
                 <Dot color="volt" />
-                <h3 className="font-bold">ILBondReactive · Lasna</h3>
+                <h3 className="font-bold">Marks are derived, never stored</h3>
               </div>
               <p className="mt-3 text-sm leading-relaxed text-bone/55">
-                The Reactive Smart Contract. Subscribes to the hook's events, computes IL in the ReactVM on each swap, and
-                calls back to settle the mark. Purely event-driven — no cron, no keeper.
+                IL is computed at read time from a position's entry price and its pool's smoothed mark, one public pure
+                function. No oracle to trust, no keeper to fund, no stored value that can rot or be poisoned.
               </p>
             </div>
           </div>
@@ -125,18 +124,17 @@ export default function About() {
           <div className="bg-ink-soft/40 p-7">
             <pre className="overflow-x-auto font-mono text-[11px] leading-relaxed text-bone/65">
 {`swap on pool
-   └─▶ Hook emits SwapOccurred(price)               [Sepolia]
-        └─▶ RSC reacts ─▶ asks hook for a data bundle
-             └─▶ Hook emits ILBondDataBundle(positions, price)
-                  └─▶ RSC computes IL = 1 − 2√r/(1+r)  [ReactVM, Lasna]
-                       └─▶ RSC callback settleILMark(id, ilBps, value)
-                            └─▶ Hook stores mark, emits ILMarkUpdated  [Sepolia]`}
+   └─▶ hook smooths the mark: markTick += (tick − markTick) / 4
+        └─▶ emits SwapOccurred(price, markPrice)   [2 storage writes, that's it]
+
+any read (app, indexer, another contract)
+   └─▶ ilMark(positionId)
+        └─▶ IL = 1 − 2√r/(1+r),  r = markPrice / entryPrice   [pure, live, exact]`}
             </pre>
           </div>
         </Card>
       </div>
 
-      {/* guide */}
       <div className="mt-16">
         <Kicker>Step by step</Kicker>
         <h2 className="mt-2 font-black text-2xl tracking-tight sm:text-3xl">How to use schizō</h2>
@@ -151,7 +149,6 @@ export default function About() {
         </div>
       </div>
 
-      {/* faq */}
       <div className="mt-16">
         <Kicker>FAQ</Kicker>
         <h2 className="mt-2 font-black text-2xl tracking-tight sm:text-3xl">Good questions</h2>
@@ -168,7 +165,6 @@ export default function About() {
         </div>
       </div>
 
-      {/* contracts */}
       <div className="mt-16">
         <Kicker>Deployed contracts</Kicker>
         <h2 className="mt-2 font-black text-2xl tracking-tight sm:text-3xl">On-chain, verifiable</h2>
@@ -177,7 +173,7 @@ export default function About() {
             <div key={c.label} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3.5">
               <div className="flex items-center gap-3">
                 <span className="font-mono text-sm font-bold">{c.label}</span>
-                <Chip color={c.net === 'Lasna' ? 'volt' : 'mint'}>{c.net}</Chip>
+                <Chip color="mint">{c.net}</Chip>
               </div>
               <Addr value={c.addr} href={c.href} />
             </div>

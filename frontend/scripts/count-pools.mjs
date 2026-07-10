@@ -1,7 +1,7 @@
 import { createPublicClient, http, parseAbi, keccak256, encodeAbiParameters } from 'viem'
 
 const c = createPublicClient({ transport: http('https://ethereum-sepolia-rpc.publicnode.com') })
-const HOOK = '0x58A3A816864F1E5f6F38F01f9f5AE1Cacc9210C0'
+const HOOK = '0x57696AB5077Aa634c13682C3d3E84287935290c0'
 const SV = '0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c'
 const FEE = 0x800000, SPACING = 60
 const svAbi = parseAbi(['function getLiquidity(bytes32 poolId) view returns (uint128)'])

@@ -32,7 +32,6 @@ contract ILBondHookEdgeTest is BaseTest {
     int24 tickLower;
     int24 tickUpper;
 
-    bytes32 constant BUNDLE_TOPIC = keccak256("ILBondDataBundle(uint256,bytes)");
     bytes32 constant POOL_REGISTERED_TOPIC =
         keccak256("PoolRegistered(bytes32,address,address,int24,uint160)");
 
@@ -42,7 +41,7 @@ contract ILBondHookEdgeTest is BaseTest {
             uint160(Hooks.AFTER_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG)
                 ^ (0x7777 << 144)
         );
-        deployCodeTo("ILBondHook.sol:ILBondHook", abi.encode(poolManager, address(this)), flags);
+        deployCodeTo("ILBondHook.sol:ILBondHook", abi.encode(poolManager), flags);
         hook = ILBondHook(payable(flags));
         tickLower = TickMath.minUsableTick(60);
         tickUpper = TickMath.maxUsableTick(60);
@@ -177,6 +176,42 @@ contract ILBondHookEdgeTest is BaseTest {
         assertEq(hook.getClaimable(address(this), t1), 0, "old fee holder gets nothing");
     }
 
+    /// Swap fees at exit must follow the CURRENT fee holder, like the premium does.
+    function test_exitFees_creditedToCurrentFeeHolder() public {
+        (PoolKey memory key,) = _newPool();
+        address t0 = Currency.unwrap(key.currency0);
+        uint256 pid = _deposit(key, 0.2e18);
+
+        address newFee = makeAddr("newFee");
+        hook.transferFeeToken(pid, newFee);
+
+        // Real swap volume accrues fees on the position.
+        deal(t0, address(this), 20e18);
+        IERC20Minimal(t0).approve(address(swapRouter), type(uint256).max);
+        swapRouter.swapExactTokensForTokens(5e18, 0, true, key, "", address(this), block.timestamp + 1);
+
+        vm.prank(newFee); // fee holder exits
+        hook.exitPosition(pid);
+
+        assertGt(hook.getClaimable(newFee, t0), 0, "swap fees route to the current FEE-T holder");
+    }
+
+    /// Once the LP has sold or transferred both legs, they hold no claim and
+    /// must not be able to force-close someone else's position.
+    function test_exit_lpLosesRightsAfterTransferringBothLegs() public {
+        (PoolKey memory key,) = _newPool();
+        uint256 pid = _deposit(key, 0.2e18);
+        hook.transferFeeToken(pid, makeAddr("feeSide"));
+        hook.transferILToken(pid, makeAddr("riskSide"));
+
+        vm.expectRevert(ILBondHook.OnlyPositionOwner.selector);
+        hook.exitPosition(pid); // this == original lp, now holds neither leg
+
+        vm.prank(makeAddr("feeSide"));
+        hook.exitPosition(pid); // a current leg holder can
+        assertFalse(_active(pid));
+    }
+
     // ── exit authorization across all three roles ───────────────────────────
 
     function test_exit_byILBuyer_authorized() public {
@@ -240,36 +275,25 @@ contract ILBondHookEdgeTest is BaseTest {
         assertGt(afterSecond, afterFirst, "second exit adds to the same claim");
     }
 
-    // ── bundle correctness: excludes exited positions ───────────────────────
+    // ── mark correctness: exited positions carry no mark ────────────────────
 
-    function test_bundle_excludesExitedPositions() public {
+    function test_ilMark_excludesExitedPositions() public {
         (PoolKey memory key,) = _newPool();
         uint256 p0 = _deposit(key, 0.1e18);
         uint256 p1 = _deposit(key, 0.1e18);
+
+        // Move the pool so live positions carry a real mark.
+        address t0 = Currency.unwrap(key.currency0);
+        deal(t0, address(this), 20e18);
+        IERC20Minimal(t0).approve(address(swapRouter), type(uint256).max);
+        swapRouter.swapExactTokensForTokens(5e18, 0, true, key, "", address(this), block.timestamp + 1);
+
         hook.exitPosition(p0); // only p1 remains active
 
-        vm.recordLogs();
-        hook.prepareILBondData(address(0));
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-
-        ILBondHook.PositionData[] memory pts;
-        for (uint256 i; i < logs.length; ++i) {
-            if (logs[i].topics[0] == BUNDLE_TOPIC) {
-                pts = abi.decode(abi.decode(logs[i].data, (bytes)), (ILBondHook.PositionData[]));
-            }
-        }
-        assertEq(pts.length, 1, "only active positions in the bundle");
-        assertEq(pts[0].positionId, p1, "the remaining active one");
-    }
-
-    // ── settleILMark emits the mark event ───────────────────────────────────
-
-    function test_settleILMark_emitsILMarkUpdated() public {
-        (PoolKey memory key,) = _newPool();
-        uint256 pid = _deposit(key, 0.1e18);
-        vm.expectEmit(true, false, false, true, address(hook));
-        emit ILBondHook.ILMarkUpdated(pid, -250, 7e18);
-        hook.settleILMark(address(0), pid, -250, 7e18);
+        (int256 il0,) = hook.ilMark(p0);
+        (int256 il1,) = hook.ilMark(p1);
+        assertEq(il0, 0, "exited position drops out of marking");
+        assertLt(il1, 0, "surviving position still marked live");
     }
 
     // ── currentFee on an uninitialized pool falls back to base ──────────────

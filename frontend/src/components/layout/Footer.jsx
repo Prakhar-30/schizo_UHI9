@@ -18,7 +18,7 @@ export default function Footer() {
             </div>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-bone/50">
               Unbundle any Uniswap v4 LP into a yield leg and a risk leg. Impermanent loss,
-              marked to market every swap by Reactive Network.
+              marked to market by the hook itself on every swap.
             </p>
             <p className="mt-4 font-mono text-[11px] uppercase tracking-wider text-bone/35">
               Built for UHI9 · Theme: Impermanent Loss
@@ -28,7 +28,9 @@ export default function Footer() {
           <div>
             <p className="kicker mb-4">Platform</p>
             <ul className="space-y-2.5 text-sm">
+              <li><Link className="link" to="/pools">Pools</Link></li>
               <li><Link className="link" to="/create">Create a bond</Link></li>
+              <li><Link className="link" to="/hunt">Underwrite</Link></li>
               <li><Link className="link" to="/markets">Markets</Link></li>
               <li><Link className="link" to="/dashboard">Dashboard</Link></li>
               <li><Link className="link" to="/about">How it works</Link></li>
@@ -39,13 +41,7 @@ export default function Footer() {
             <p className="kicker mb-4">Network</p>
             <ul className="space-y-2.5 text-sm text-bone/60">
               <li>{net.name}</li>
-              <li>Reactive Lasna</li>
               <li className="pt-1">
-                <a className="link" href="https://reactive.network" target="_blank" rel="noreferrer">
-                  reactive.network ↗
-                </a>
-              </li>
-              <li>
                 <a className="link" href="https://docs.uniswap.org/contracts/v4/overview" target="_blank" rel="noreferrer">
                   Uniswap v4 ↗
                 </a>
@@ -59,10 +55,6 @@ export default function Footer() {
               <li className="flex items-center justify-between gap-2">
                 <span className="shrink-0 text-bone/45">Hook</span>
                 <Addr value={net.addr.hook} href={net.addrUrl(net.addr.hook)} />
-              </li>
-              <li className="flex items-center justify-between gap-2">
-                <span className="shrink-0 text-bone/45">Reactive</span>
-                <Addr value={net.addr.reactive} href={net.reactscanUrl(net.addr.reactive)} />
               </li>
               <li className="flex items-center justify-between gap-2">
                 <span className="shrink-0 text-bone/45">{net.getToken(net.demoPool.token0).symbol}</span>
@@ -79,7 +71,7 @@ export default function Footer() {
         <Divider className="my-8" />
         <div className="flex flex-col items-center justify-between gap-3 text-center sm:flex-row sm:text-left">
           <p className="font-mono text-[11px] uppercase tracking-wider text-bone/35">
-            © {new Date().getFullYear()} schizō — testnet only, not financial advice
+            © {new Date().getFullYear()} schizō · testnet only, not financial advice
           </p>
           <p className="font-mono text-[11px] uppercase tracking-wider text-bone/35">
             yield <span className="text-yield">/</span> risk <span className="text-risk">/</span> split

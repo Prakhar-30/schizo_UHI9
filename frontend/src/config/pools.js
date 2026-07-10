@@ -1,11 +1,9 @@
 import { keccak256, encodeAbiParameters } from 'viem'
 import { ADDR, DYNAMIC_FEE_FLAG, TICK_SPACING } from './contracts'
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  TOKEN REGISTRY — the Sepolia (original) deployment's 10 tokens.
+//  TOKEN REGISTRY - the Sepolia (original) deployment's 10 tokens.
 //  Other chains supply their own token list via config/networks.js. Keyed by
 //  lowercased address. `mintable` = our MockERC20 with public mint() → faucet.
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const SEPOLIA_RAW_TOKENS = [
   // custom (mintable)
@@ -24,9 +22,7 @@ export const SEPOLIA_RAW_TOKENS = [
 
 const UNKNOWN = { symbol: '???', name: 'Unknown token', decimals: 18, mintable: false }
 
-// ─────────────────────────────────────────────────────────────────────────────
 //  POOL KEY / ID
-// ─────────────────────────────────────────────────────────────────────────────
 
 const POOL_KEY_TUPLE = [
   {
@@ -58,11 +54,9 @@ export function poolIdFromKey(key) {
   return keccak256(encodeAbiParameters(POOL_KEY_TUPLE, [key]))
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  REGISTRY BUILDER — given a chain's token list + hook, produce every
+//  REGISTRY BUILDER - given a chain's token list + hook, produce every
 //  C(n,2) pair pool (matching the on-chain deploy script's token order) plus
 //  lookups. Used per-network by config/networks.js.
-// ─────────────────────────────────────────────────────────────────────────────
 
 export function buildPoolRegistry({ rawTokens, hook = ADDR.hook, demoPair }) {
   const tokens = Object.fromEntries(rawTokens.map((t) => [t.address.toLowerCase(), t]))
@@ -102,10 +96,8 @@ export function buildPoolRegistry({ rawTokens, hook = ADDR.hook, demoPair }) {
   return { tokens, getToken, pools, poolsById, demoPool, getPoolById }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 //  Sepolia defaults (legacy/back-compat: the OG edge function + any module that
 //  imports a fixed registry). Chain-aware UI code should use useNetwork() instead.
-// ─────────────────────────────────────────────────────────────────────────────
 
 const sepoliaRegistry = buildPoolRegistry({
   rawTokens: SEPOLIA_RAW_TOKENS,

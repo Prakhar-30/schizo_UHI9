@@ -1,40 +1,30 @@
-import { fmtToken, fmtBpsPct, shortAddr, timeAgo } from '../lib/format'
+import { fmtToken, shortAddr, timeAgo } from '../lib/format'
 import { useNetwork } from '../context/NetworkContext'
 import { Spinner } from './ui/Bits'
 
 const META = {
-  ILMarkUpdated: { color: 'text-mint border-mint/40', glyph: '◉', rsc: true },
-  ILBondDataBundle: { color: 'text-volt border-volt/40', glyph: '⇄', rsc: true },
-  CycleCompleted: { color: 'text-volt border-volt/40', glyph: '↻', rsc: true },
-  SwapOccurred: { color: 'text-bone/70 border-white/15', glyph: '⇋' },
+  SwapOccurred: { color: 'text-bone/70 border-white/15', glyph: '⇋', mark: true },
   PositionCreated: { color: 'text-yield border-yield/40', glyph: '+' },
   PositionExited: { color: 'text-bone/40 border-white/15', glyph: '−' },
   ILBondSold: { color: 'text-risk border-risk/40', glyph: '✦' },
+  FeesCollected: { color: 'text-yield border-yield/40', glyph: '◈' },
   FeeTokenTransferred: { color: 'text-yield border-yield/30', glyph: '→' },
   ILTokenTransferred: { color: 'text-risk border-risk/30', glyph: '→' },
 }
 
 function describe(name, a, posById) {
   switch (name) {
-    case 'ILMarkUpdated':
-      return (
-        <>
-          RSC marked position <b className="text-bone">#{a.positionId?.toString()}</b> →{' '}
-          <b className="text-mint">{fmtBpsPct(a.ilBps)}</b> IL
-        </>
-      )
-    case 'ILBondDataBundle':
-      return (
-        <>
-          Hook emitted data bundle <b className="text-bone">#{a.bundleId?.toString()}</b> for the RSC
-        </>
-      )
-    case 'CycleCompleted':
-      return <>RSC cycle completed · {a.positionsChecked?.toString()} positions</>
     case 'SwapOccurred':
       return (
         <>
-          Swap on the pool · tick <b className="text-bone">{a.tick?.toString()}</b>
+          Swap re-marked the pool · tick <b className="text-bone">{a.tick?.toString()}</b>
+        </>
+      )
+    case 'FeesCollected':
+      return (
+        <>
+          Fees harvested on <b className="text-bone">#{a.positionId?.toString()}</b> →{' '}
+          {shortAddr(a.feeHolder)}
         </>
       )
     case 'PositionCreated':
@@ -107,7 +97,7 @@ export default function ActivityFeed({ events, isLoading, emptyLabel = 'No activ
               <p className="truncate text-sm text-bone/80">{describe(e.name, e.args, positionsById)}</p>
               <div className="mt-0.5 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-bone/30">
                 <span>{timeAgo(e.ts)}</span>
-                {m.rsc && <span className="rounded border border-volt/40 px-1 text-volt">reactive</span>}
+                {m.mark && <span className="rounded border border-volt/40 px-1 text-volt">mark</span>}
               </div>
             </div>
             <a

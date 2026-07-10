@@ -4,16 +4,9 @@ import { encodeFunctionData, toHex } from 'viem'
 import { useToast } from '../components/ui/Toast'
 import { useNetwork } from '../context/NetworkContext'
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Unichain Sepolia gas-estimation workaround
-//  Its RPC nodes reject the *unbounded* eth_estimateGas that wallets/viem send
-//  by default ("-32000: intrinsic gas too high"), so every contract write shows
-//  "Network fee: Unavailable" and can't be submitted — even though the tx is
-//  perfectly valid on-chain. The node estimates fine when given an explicit gas
-//  *cap*, so for this chain we estimate ourselves (capped + buffered) and hand
-//  the result to the wallet, which then skips its own broken estimation.
-//  Scoped to chainId 1301 only — every other chain is left completely untouched.
-// ─────────────────────────────────────────────────────────────────────────────
+// Unichain Sepolia rejects unbounded eth_estimateGas ("intrinsic gas too high"),
+// which breaks every wallet write. Estimating ourselves with an explicit cap
+// works, so on chainId 1301 we pre-compute the gas and hand it to the wallet.
 const GAS_ESTIMATE_CHAINS = new Set([1301]) // Unichain Sepolia
 const GAS_CAP = 2_000_000n // upper bound the node accepts; >> any op (~600k), << the ~24M bad range
 const GAS_BUFFER_PCT = 125n // +25% safety margin over the estimate
@@ -21,7 +14,6 @@ const GAS_BUFFER_PCT = 125n // +25% safety margin over the estimate
 export function parseTxError(e) {
   const raw = e?.shortMessage || e?.details || e?.message || 'Unknown error'
   if (/user rejected|denied|rejected the request/i.test(raw)) return 'rejected'
-  // keep it short for the toast
   return raw.split('\n')[0].slice(0, 140)
 }
 
@@ -64,8 +56,6 @@ export function useTx() {
       try {
         setPending(true)
         const req = { chainId: net.chainId, ...request }
-        // On chains with broken default gas estimation (Unichain Sepolia), supply
-        // an explicit gas limit so the wallet doesn't run the failing estimate.
         if (GAS_ESTIMATE_CHAINS.has(net.chainId) && req.gas == null && address && publicClient) {
           req.gas = await estimateGasCapped(publicClient, address, request)
         }

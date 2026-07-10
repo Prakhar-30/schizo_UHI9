@@ -9,12 +9,12 @@ import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {LPFeeLibrary} from "@uniswap/v4-core/src/libraries/LPFeeLibrary.sol";
 import {IUniswapV4Router04} from "hookmate/interfaces/router/IUniswapV4Router04.sol";
 
-/// @notice Moves price on the 3 pools that have IL-bond positions, so the RSC
-///         recomputes & posts IL marks (callbacks now land — hook is funded).
+/// @notice Moves price on the 3 pools that have IL-bond positions, so the hook's
+///         smoothed mark moves and every position re-prices on the next read.
 contract TriggerMarks is Script {
     uint24 constant DYN = LPFeeLibrary.DYNAMIC_FEE_FLAG;
     int24 constant SPACING = 60;
-    address constant HOOK = 0x9D19eA2aad6c8748d566f28fe375fb8BCAA350c0;
+    address constant HOOK = 0x57696AB5077Aa634c13682C3d3E84287935290c0;
     IUniswapV4Router04 constant ROUTER = IUniswapV4Router04(payable(0xf13D190e9117920c703d79B5F33732e10049b115));
 
     address constant WETH = 0x748b5C9623528D346C414F4f236B3b5b5c7683cb;

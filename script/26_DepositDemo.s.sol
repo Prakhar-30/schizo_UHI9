@@ -24,7 +24,7 @@ contract DepositDemo is Script {
     uint24 constant DYN = LPFeeLibrary.DYNAMIC_FEE_FLAG;
     int24 constant SPACING = 60;
     IPoolManager constant PM = IPoolManager(0xE03A1074c86CFeDd5C142C4F04F1a1536e203543);
-    ILBondHook constant HOOK = ILBondHook(payable(0x58A3A816864F1E5f6F38F01f9f5AE1Cacc9210C0));
+    ILBondHook constant HOOK = ILBondHook(payable(0x57696AB5077Aa634c13682C3d3E84287935290c0));
     address constant WETH = 0x748b5C9623528D346C414F4f236B3b5b5c7683cb;
     address constant WBTC = 0x912A7Fb66391eAe95DDee40B664FF497108580CD;
 

@@ -29,7 +29,6 @@ function LegBox({ kind, title, points }) {
 export default function SplitDiagram() {
   return (
     <div className="relative">
-      {/* the source */}
       <div className="mx-auto max-w-sm">
         <div className="card glass-strong p-5 text-center">
           <span className="kicker">1 Uniswap v4 LP position</span>
@@ -38,7 +37,6 @@ export default function SplitDiagram() {
         </div>
       </div>
 
-      {/* split connector */}
       <div className="relative mx-auto my-1 h-12 w-px">
         <svg viewBox="0 0 200 60" className="absolute left-1/2 top-0 h-12 w-[260px] -translate-x-1/2 overflow-visible">
           <path d="M100 0 V20 M100 20 C100 40 40 30 30 58 M100 20 C100 40 160 30 170 58" stroke="#3a3a47" strokeWidth="2" fill="none" />
@@ -56,8 +54,8 @@ export default function SplitDiagram() {
         />
         <LegBox
           kind="il"
-          title="Pure exposure to price moves"
-          points={['Bears the impermanent loss', 'Marked to market every swap', 'Held by vol traders / speculators']}
+          title="The risk, warehoused for a premium"
+          points={['Absorbs the impermanent loss', 'Marked to market every swap', 'Held by underwriters / hedging desks']}
         />
       </div>
     </div>
