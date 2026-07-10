@@ -57,7 +57,7 @@ export default function About() {
         <Chip color="volt">
           <Dot color="volt" pulse /> UHI9 · Theme: Impermanent Loss
         </Chip>
-        <h1 className="mt-5 font-black text-balance text-3xl leading-[1] tracking-tight sm:text-5xl lg:text-6xl">
+        <h1 className="mt-5 font-black text-balance text-3xl leading-[1] tracking-tight sm:text-5xl">
           LP yield, without impermanent loss.
         </h1>
         <p className="mt-6 text-lg leading-relaxed text-bone/60">

@@ -11,7 +11,7 @@ export default function Layout() {
   }, [pathname])
 
   return (
-    <div className="relative flex min-h-screen flex-col">
+    <div className="relative flex min-h-screen flex-col overflow-x-clip">
       <Backdrop />
       <Navbar />
       <main className="flex-1">

@@ -14,7 +14,7 @@ export default function PoolSelector({ label = 'Pool', className = '' }) {
       <select
         value={poolId}
         onChange={(e) => setPoolId(e.target.value)}
-        className="w-full rounded-lg border-2 border-white/15 bg-ink-card px-3 py-2.5 font-mono text-sm font-bold text-bone focus:border-volt focus:outline-none"
+        className="w-full min-w-0 max-w-full rounded-lg border-2 border-white/15 bg-ink-card px-3 py-2.5 font-mono text-sm font-bold text-bone focus:border-volt focus:outline-none"
       >
         {pools.map((p) => (
           <option key={p.id} value={p.id}>

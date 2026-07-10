@@ -26,7 +26,7 @@ export default function Home() {
     <div>
       <section className="relative mx-auto max-w-7xl px-4 pb-8 pt-8 sm:px-6 sm:pb-10 sm:pt-[4.8rem]">
         <div className="grid items-center gap-8 sm:gap-12 lg:grid-cols-[1.1fr_0.9fr]">
-          <div>
+          <div className="min-w-0">
             <div className="mb-6 inline-flex items-center gap-2">
               <Chip color="volt">
                 <Dot color="volt" pulse /> Live on {net.name}
@@ -60,7 +60,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="relative">
+          <div className="relative min-w-0">
             <div className="absolute -inset-4 rounded-[2rem] bg-gradient-to-br from-volt/20 via-transparent to-risk/20 blur-2xl" />
             <div className="relative">
               <SwapPanel />

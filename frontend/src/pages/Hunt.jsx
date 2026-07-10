@@ -203,7 +203,7 @@ export default function Hunt() {
 
       <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
         <Stat
-          label="Open to underwrite"
+          label="Open bonds"
           value={buyable.length.toString()}
           sub={`of ${positions.filter((p) => p.active).length} active`}
           accent="amber"
